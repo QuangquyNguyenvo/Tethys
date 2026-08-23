@@ -1,0 +1,49 @@
+[package]
+name = "app"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# KHÔNG bật feature `unstable`. Đã thử vì `Window::add_child` (nhiều webview trong một cửa sổ)
+# là con đường duy nhất cho panel web thật, và nó **hỏng** ở 2.11.5: webview con dựng được
+# nhưng không nạp trang nào, không render gì. Bằng chứng ở `plans/terminal-workspace/CHECKLIST.md`.
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+portable-pty = "0.9.0"
+anyhow = "1.0.104"
+winreg = "0.56.0"
+notify = "6"
+window-vibrancy = "0.8.0"
+windows = { version = "0.61", features = [
+  "Win32_Media_Audio",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+] }
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Security",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
+  "Win32_System_Ioctl",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+] }
+rfd = "0.15"

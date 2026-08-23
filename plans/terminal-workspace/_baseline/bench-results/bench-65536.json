@@ -1,0 +1,22 @@
+﻿{
+    "avg_chunk":  54127,
+    "bytes":  50500326,
+    "flush_ms":  12,
+    "flushes":  933,
+    "fps_avg":  144,
+    "fps_min":  142,
+    "fps_samples":  [
+                        144,
+                        144,
+                        144,
+                        142,
+                        145,
+                        144
+                    ],
+    "mb_per_s":  8.8,
+    "min_bytes":  65536,
+    "seconds":  5.76,
+    "shell":  "powershell.exe",
+    "peak_private_mb":  725,
+    "settled_private_mb":  632
+}

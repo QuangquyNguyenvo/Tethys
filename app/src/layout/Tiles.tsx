@@ -1,0 +1,380 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ITheme } from "@xterm/xterm";
+import { TerminalPanel } from "../terminal/TerminalPanel";
+import { PreviewPanel } from "../preview/PreviewPanel";
+import { ExplorerPanel } from "../explorer/ExplorerPanel";
+import { WebPanel } from "../web/WebPanel";
+import { SettingsPanel } from "../settings/SettingsPanel";
+import { SystemPanel } from "../system/SystemPanel";
+import { useSessions, type Panel } from "../store/sessions";
+import {
+  computeLayout,
+  indicatorRect,
+  rootIndicatorRect,
+  type GutterInfo,
+  type Layout,
+  type Rect,
+} from "./geometry";
+import { setSnapshot } from "./snapshot";
+import { Folder, Plus, Terminal } from "lucide-react";
+
+type Props = { theme?: ITheme };
+
+const place = (r: Rect): React.CSSProperties => ({
+  transform: `translate(${r.x}px, ${r.y}px)`,
+  width: r.w,
+  height: r.h,
+});
+
+/**
+ * Canvas tiling.
+ *
+ * Bất biến quan trọng nhất của file này: **panel không bao giờ đổi cha trong DOM.**
+ * Mọi panel nằm phẳng ở một tầng duy nhất, chỉ đổi `transform` và kích thước khi cây
+ * layout đổi. Bản trước lồng panel vào trong cây grid (rồi tới bản portal cũng vẫn đổi
+ * container), nên mỗi lần split là React tháo `TerminalPanel` xuống — `usePty` cleanup
+ * gọi `pty_kill`, shell chết, phiên agent đang chạy mất trắng. Giữ panel phẳng là cách
+ * duy nhất khiến việc đó không thể xảy ra, kể cả khi đổi workspace.
+ */
+export function Tiles({ theme }: Props) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<Rect>({ x: 0, y: 0, w: 0, h: 0 });
+
+  const tree = useSessions((s) => s.tree);
+  const panels = useSessions((s) => s.panels);
+  const workspaces = useSessions((s) => s.workspaces);
+  const hydrated = useSessions((s) => s.hydrated);
+  const drag = useSessions((s) => s.drag);
+  const createPanel = useSessions((s) => s.createPanel);
+
+  // Theo dõi kích thước canvas. Toạ độ viewport phải cập nhật cả khi cửa sổ chỉ bị dời chỗ,
+  // vì kéo thả quy đổi clientX/Y qua gốc này.
+  useLayoutEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const read = () => {
+      const r = el.getBoundingClientRect();
+      setBox((prev) =>
+        prev.x === r.left && prev.y === r.top && prev.w === r.width && prev.h === r.height
+          ? prev
+          : { x: r.left, y: r.top, w: r.width, h: r.height },
+      );
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    window.addEventListener("resize", read);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", read);
+    };
+  }, []);
+
+  const layout = useMemo(
+    () => computeLayout(tree, { x: 0, y: 0, w: box.w, h: box.h }),
+    [tree, box.w, box.h],
+  );
+
+  // Store cần hình học này để tính đích thả mà không phải import ngược lên đây.
+  useEffect(() => {
+    setSnapshot({ layout, origin: box });
+    return () => setSnapshot(null);
+  }, [layout, box]);
+
+  // Panel của workspace khác vẫn phải sống (shell không được chết khi đổi tab), nhưng
+  // chỉ dựng sau khi workspace đó được mở lần đầu — nếu không, mở app là spawn hết mọi shell.
+  const mounted = useRef(new Set<string>());
+  layout.rects.forEach((_r, k) => mounted.current.add(k));
+
+  // Giữ lại khung cuối cùng của panel đang ẩn: đổi tab về không phải fit lại từ 0×0.
+  const lastRects = useRef(new Map<string, Rect>());
+  layout.rects.forEach((r, k) => lastRects.current.set(k, r));
+
+  const allPanels = useMemo(() => {
+    const map = new Map<string, Panel>();
+    workspaces.forEach((w) => w.panels.forEach((p) => map.set(p.key, p)));
+    panels.forEach((p) => map.set(p.key, p));
+    return Array.from(map.values()).filter((p) => mounted.current.has(p.key));
+  }, [workspaces, panels, layout]);
+
+  const ready = hydrated && box.w > 0 && box.h > 0;
+
+  // Bóng panel vừa đóng.
+  //
+  // Không giữ panel sống thêm 200ms để nó tự co lại: làm thế thì layout cũng đứng yên
+  // chờ, và những panel còn lại giật một phát khi nó biến mất. Thay vào đó bỏ panel khỏi
+  // cây ngay (các panel khác trượt vào chỗ trống nhờ transition ở `.panel-host`), rồi vẽ
+  // một hình chữ nhật trống ở đúng khung cuối cùng của nó và cho hình đó co lại.
+  const [ghosts, setGhosts] = useState<{ id: string; rect: Rect }[]>([]);
+  const prevKeys = useRef<string[]>([]);
+  useEffect(() => {
+    const now = allPanels.map((p) => p.key);
+    const gone = prevKeys.current.filter((k) => !now.includes(k));
+    prevKeys.current = now;
+    if (gone.length === 0) return;
+    const born = gone
+      .map((k) => ({ id: k + ":" + Date.now(), rect: lastRects.current.get(k) }))
+      .filter((g): g is { id: string; rect: Rect } => !!g.rect);
+    if (born.length === 0) return;
+    setGhosts((g) => [...g, ...born]);
+    const ids = new Set(born.map((b) => b.id));
+    const t = setTimeout(() => setGhosts((g) => g.filter((x) => !ids.has(x.id))), 360);
+    return () => clearTimeout(t);
+  }, [allPanels]);
+
+  return (
+    <div ref={hostRef} className={"tiles" + (drag ? " is-dragging" : "")}>
+      {ready &&
+        allPanels.map((p) => {
+          const visible = layout.rects.has(p.key);
+          const rect = layout.rects.get(p.key) ?? lastRects.current.get(p.key) ?? box;
+          return (
+            <PanelHost
+              key={p.key}
+              panel={p}
+              rect={rect}
+              visible={visible}
+              theme={theme}
+            />
+          );
+        })}
+
+      {ghosts.map((g) => (
+        <div key={g.id} className="panel-ghost" style={place(g.rect)}>
+          {/* Lớp trong mới là lớp co lại: `transform` của lớp ngoài đang giữ toạ độ,
+              cho keyframe đặt `scale` lên đó là nó nhảy về góc canvas. */}
+          <div className="panel-ghost-fill" />
+        </div>
+      ))}
+
+      {ready && layout.gutters.map((g) => <Gutter key={g.id} info={g} />)}
+
+      {ready && !tree && (
+        <EmptyState
+          onTerminal={() => createPanel({ type: "terminal" })}
+          onFiles={() => createPanel({ type: "explorer" })}
+        />
+      )}
+
+      {drag && <DropOverlay box={{ x: 0, y: 0, w: box.w, h: box.h }} layout={layout} />}
+    </div>
+  );
+}
+
+function PanelHost({
+  panel,
+  rect,
+  visible,
+  theme,
+}: {
+  panel: Panel;
+  rect: Rect;
+  visible: boolean;
+  theme?: ITheme;
+}) {
+  const previousRect = useRef<Rect | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const [motionOffset, setMotionOffset] = useState<{ x: number; y: number } | null>(null);
+  const [motionArmed, setMotionArmed] = useState(false);
+  const focused = useSessions((s) => s.focused === panel.key);
+  const isSource = useSessions((s) => s.drag?.key === panel.key);
+  const focus = useSessions((s) => s.focus);
+
+  // Fallback FLIP luôn hoạt động trên WebView2: parent nhận hình học mới một lần, còn
+  // lớp visual bên trong bắt đầu tại toạ độ cũ rồi translate về vị trí thật. Không scale
+  // canvas chữ của xterm và không động tới backdrop-filter, nên blur giữ nguyên.
+  useLayoutEffect(() => {
+    const previous = previousRect.current;
+    previousRect.current = rect;
+    if (!previous || !visible || (previous.x === rect.x && previous.y === rect.y)) return;
+
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    setMotionArmed(false);
+    setMotionOffset({ x: previous.x - rect.x, y: previous.y - rect.y });
+    frameRef.current = requestAnimationFrame(() => {
+      setMotionArmed(true);
+      setMotionOffset(null);
+      frameRef.current = null;
+    });
+    return () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    };
+  }, [rect.x, rect.y, rect.w, rect.h, visible]);
+
+  return (
+    <div
+      className={
+        "panel-host" +
+        (focused ? " on" : "") +
+        (visible ? "" : " hidden") +
+        (isSource ? " drag-source" : "")
+      }
+      style={place(rect)}
+      data-panel-key={panel.key}
+      data-panel-type={panel.type ?? "terminal"}
+      onPointerDownCapture={() => focus(panel.key)}
+      onFocusCapture={() => focus(panel.key)}
+    >
+      <div
+        className={"panel-motion" + (motionArmed ? " is-moving" : "")}
+        style={motionOffset ? { transform: `translate3d(${motionOffset.x}px, ${motionOffset.y}px, 0)` } : undefined}
+      >
+        {panel.type === "preview" && panel.path ? (
+          <PreviewPanel panelKey={panel.key} path={panel.path} mode={panel.mode} />
+        ) : panel.type === "explorer" ? (
+          <ExplorerPanel panelKey={panel.key} path={panel.path} />
+        ) : panel.type === "web" ? (
+          <WebPanel panelKey={panel.key} url={panel.url} />
+        ) : panel.type === "settings" ? (
+          <SettingsPanel panelKey={panel.key} />
+        ) : panel.type === "system" ? (
+          <SystemPanel panelKey={panel.key} />
+        ) : (
+          <TerminalPanel
+            panelKey={panel.key}
+            shell={panel.shell}
+            cwd={panel.cwd}
+            theme={theme}
+            visible={visible}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Gutter({ info }: { info: GutterInfo }) {
+  const resize = useSessions((s) => s.resize);
+  const [active, setActive] = useState(false);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const el = e.currentTarget;
+      const pointerId = e.pointerId;
+      const host = el.parentElement?.getBoundingClientRect();
+      if (!host) return;
+
+      el.setPointerCapture(pointerId);
+      setActive(true);
+      document.body.classList.add("resizing-layout");
+
+      const onMove = (ev: PointerEvent) => {
+        const r =
+          info.dir === "row"
+            ? (ev.clientX - host.left - info.parent.x) / info.parent.w
+            : (ev.clientY - host.top - info.parent.y) / info.parent.h;
+        resize(info.path, r);
+      };
+      const onUp = () => {
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointercancel", onUp);
+        try {
+          el.releasePointerCapture(pointerId);
+        } catch {
+          /* đã nhả rồi */
+        }
+        setActive(false);
+        document.body.classList.remove("resizing-layout");
+      };
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onUp);
+      el.addEventListener("pointercancel", onUp);
+    },
+    [info.dir, info.parent.x, info.parent.y, info.parent.w, info.parent.h, info.path, resize],
+  );
+
+  return (
+    <div
+      className={"gutter " + info.dir + (active ? " active" : "")}
+      style={place(info.rect)}
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => resize(info.path, 0.5)}
+      role="separator"
+      aria-orientation={info.dir === "row" ? "vertical" : "horizontal"}
+      title="Kéo để chỉnh kích thước · Nhấn đúp để chia đều 50/50"
+    >
+      <span className="gutter-grip" />
+    </div>
+  );
+}
+
+const ZONE_LABEL: Record<string, string> = {
+  left: "Chia sang trái",
+  right: "Chia sang phải",
+  top: "Chia lên trên",
+  bottom: "Chia xuống dưới",
+  center: "Hoán đổi vị trí",
+};
+
+const ROOT_LABEL: Record<string, string> = {
+  left: "Đưa ra mép trái",
+  right: "Đưa ra mép phải",
+  top: "Đưa lên trên cùng",
+  bottom: "Đưa xuống dưới cùng",
+};
+
+function DropOverlay({ box, layout }: { box: Rect; layout: Layout }) {
+  const drag = useSessions((s) => s.drag);
+  if (!drag) return null;
+
+  let rect: Rect | null = null;
+  let label = "";
+
+  if (drag.root) {
+    rect = rootIndicatorRect(box, drag.root);
+    label = ROOT_LABEL[drag.root];
+  } else if (drag.target && drag.zone) {
+    const target = layout.rects.get(drag.target);
+    if (target) {
+      rect = indicatorRect(target, drag.zone);
+      label = ZONE_LABEL[drag.zone];
+    }
+  }
+
+  return (
+    <>
+      {rect && (
+        <div
+          className={"drop-indicator" + (drag.zone === "center" && !drag.root ? " swap" : "")}
+          style={place(rect)}
+        >
+          <span className="drop-badge">{label}</span>
+        </div>
+      )}
+      <div className="drag-ghost" style={{ transform: `translate(${drag.x}px, ${drag.y}px)` }}>
+        <span className="drag-ghost-dot" />
+        <span>đang di chuyển panel</span>
+      </div>
+    </>
+  );
+}
+
+function EmptyState({ onTerminal, onFiles }: { onTerminal: () => void; onFiles: () => void }) {
+  return (
+    <div className="empty-workspace">
+      <div className="empty-card">
+        <div className="empty-icon">
+          <Terminal size={30} strokeWidth={1.8} />
+        </div>
+        <h3>Không gian làm việc trống</h3>
+        <p>Mở terminal hoặc xem file tài liệu để bắt đầu</p>
+        <div className="empty-actions">
+          <button className="empty-btn primary" onClick={onTerminal}>
+            <Plus size={14} />
+            <span>Mở Terminal mới</span>
+          </button>
+          <button className="empty-btn secondary" onClick={onFiles}>
+            <Folder size={14} />
+            <span>Duyệt tệp</span>
+          </button>
+        </div>
+        <div className="empty-hints">
+          <span><kbd>Ctrl+K</kbd> Bảng lệnh · <kbd>Win + ← ↑ ↓ →</kbd> Snap block</span>
+        </div>
+      </div>
+    </div>
+  );
+}

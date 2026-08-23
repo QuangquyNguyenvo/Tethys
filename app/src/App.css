@@ -1,0 +1,1938 @@
+/* Phase 03 — mọi màu đến từ biến `--ui-*` do `theme/palette.ts` sinh ra từ ảnh nền.
+   KHÔNG hex nào ở đây. Nếu thấy `#` trong file này nghĩa là có chỗ đã đi tắt.
+
+   Chỉ thị U1 — không glow: phân tầng bằng bậc surface + `outline-variant`,
+   không bằng hào quang màu. Bóng nếu có thì là bóng đen tả độ cao, không phải màu.
+   Chỉ thị U2 — round, soft: shape scale M3, chroma thấp cho chrome. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+
+body {
+  font: 13px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  background: transparent;
+  color: var(--ui-on-background);
+  overflow: hidden;
+}
+
+:root {
+  /* Motion M3 expressive */
+  --e-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
+  --e-emphasized: cubic-bezier(0.2, 0.0, 0, 1.0);
+  --e-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+  --e-bounce: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-window: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Shape scale M3 */
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 13px;
+  --r-lg: 17px;
+  --r-xl: 22px;
+  --r-full: 9999px;
+  /* Bo góc panel — §7.7 điểm 1 nói phải chỉnh được, đây là chỗ chỉnh. */
+  --r-panel: 18px;
+
+  /* Khe giữa các panel. Phải khớp `GUTTER` trong `layout/geometry.ts`. */
+  --gap: 10px;
+  /* Lề quanh thanh trên. Đây là thứ biến nó từ "dính mép" thành "nổi". */
+  --bar-inset: 8px;
+  --nav-bar-h: 40px;
+  /* Cao thực: thanh 40px cộng khoảng hở nổi 8px ở phía trên. */
+  --titlebar-h: calc(var(--nav-bar-h) + var(--bar-inset));
+  --head-h: 34px;
+  --dock-h: 54px;
+
+  /* Bóng đổ tả độ cao, không tả màu (chỉ thị U1). `.settings-shell` gọi biến này từ trước
+     nhưng chưa nơi nào khai báo — biến không tồn tại làm hỏng *cả* khai báo `box-shadow`,
+     nên viền trong sáng của panel Cài đặt cũng mất theo. */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.16), 0 2px 6px rgb(0 0 0 / 0.18);
+
+  --font-mono: "CaskaydiaCove Nerd Font", "Cascadia Mono", Consolas, monospace;
+}
+
+/* ==========================================================================
+   Vỏ app — nền, titlebar, canvas, dock
+   ========================================================================== */
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: var(--ui-background);
+}
+
+/* Ảnh nền để gần như nguyên bản: panel đã đục nên không cần làm mờ để đọc được chữ,
+   mà bỏ blur toàn màn hình cũng chính là bỏ khoản GPU đắt nhất (§7.7 điểm 3). */
+.app-wallpaper-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: saturate(1.18) brightness(0.86);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Thanh trên là một hòn đảo nổi, không phải một dải dính mép trên.
+   Bản cũ chạy hết bề ngang, vuông góc, có gạch chân — đó là thanh tiêu đề của Windows.
+   Kiểu bar của caelestia/Hyprland thì tách khỏi mép, bo tròn hết cỡ, nền kính mờ, và
+   ảnh nền chạy vòng quanh nó. Nay nó ăn khớp với dock ở đáy: cùng một hòn đảo mờ. */
+.titlebar {
+  height: var(--titlebar-h);
+  flex: none;
+  padding: var(--bar-inset) var(--bar-inset) 0;
+  user-select: none;
+  position: relative;
+  z-index: 100;
+  -webkit-app-region: drag;
+  transition:
+    margin-top 320ms var(--e-window),
+    transform 320ms var(--e-window),
+    opacity 200ms var(--e-standard);
+}
+
+.app.nav-auto .titlebar {
+  position: relative;
+  margin-top: calc(-1 * var(--titlebar-h) + 8px);
+  opacity: 0.86;
+}
+
+/* Vùng hot zone kích hoạt nav bar: khi chuột đến gần mép trên (trong khoảng 32px),
+   thanh điều hướng sẽ trượt xuống ngay lập tức và đẩy các block bên dưới xuống */
+.app.nav-auto .titlebar::before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 28px;
+  pointer-events: auto;
+  z-index: 101;
+}
+
+.app.nav-auto .titlebar:hover,
+.app.nav-auto .titlebar:focus-within {
+  margin-top: 0;
+  opacity: 1;
+}
+
+.app.nav-auto .titlebar:hover::before,
+.app.nav-auto .titlebar:focus-within::before {
+  display: none;
+}
+
+.app.nav-auto .titlebar::after {
+  content: "";
+  position: absolute;
+  width: 56px;
+  height: 4px;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ui-primary) 65%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ui-primary) 28%, transparent);
+  transition: opacity 140ms var(--e-standard), transform 260ms var(--e-window);
+}
+.app.nav-auto .titlebar:hover::after,
+.app.nav-auto .titlebar:focus-within::after {
+  opacity: 0;
+  transform: translateX(-50%) scaleX(0.55);
+}
+
+.tb-bar {
+  height: var(--nav-bar-h);
+  /* Ba cột `1fr auto 1fr` — chỉ grid mới cho cụm giữa nằm giữa *thanh*. Flex + spacer chỉ
+     cho nó nằm giữa khoảng trống còn lại, lệch đúng bằng hiệu bề ngang hai cụm hai bên. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: drag;
+  /* Padding phải đối xứng, nếu không hai cột `1fr` không bằng nhau và cụm giữa lệch đúng
+     một nửa hiệu số. Khoảng thở bên trái của brand nằm ở `.titlebar-left`, không nằm đây. */
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  /* Nhạt hơn hẳn bản trước. Thanh trên không phải thứ để nhìn — nó chỉ cần đứng đó,
+     nên nền chìm vào ảnh nền và viền mảnh gần như không thấy. */
+  background: color-mix(in srgb, var(--ui-surface-container) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 38%, transparent);
+  backdrop-filter: blur(30px) saturate(140%);
+}
+
+/* Chế độ hiệu năng: giữ surface trong suốt nhưng bỏ compositor blur vốn tốn GPU nhất. */
+.app.effects-off .tb-bar,
+.app.effects-off .dock,
+.app.effects-off .panel.terminal-panel,
+.app.effects-off .palette-backdrop,
+.app.effects-off .ctx-menu {
+  backdrop-filter: none;
+}
+
+.titlebar-left,
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.titlebar-left { justify-self: start; padding-left: 9px; }
+.titlebar-right { justify-self: end; }
+
+/* Khoảng trống hai bên cụm tab vẫn là vùng kéo cửa sổ, nên thanh không có chỗ chết. */
+.titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-width: 0;
+  -webkit-app-region: drag;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+  color: var(--ui-on-surface);
+  flex: none;
+  padding-right: 2px;
+}
+
+.brand-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex: none;
+}
+
+.brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--ui-primary);
+}
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  height: 100%;
+  min-width: 0;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+/* Tab là một cột: mặt tab ở trên, gạch chân sát đáy thanh. `justify-content: space-between`
+   ghim gạch xuống đáy mà không cần định vị tuyệt đối — bo tròn của thanh sẽ cắt mất một
+   gạch dán bằng `position: absolute; bottom: 0`. */
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding-top: 0;
+  cursor: pointer;
+  flex: none;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+
+.tab-face {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-on-surface-variant);
+  white-space: nowrap;
+  transition: background 120ms var(--e-standard), color 120ms var(--e-standard);
+}
+
+.tab-item:hover .tab-face {
+  background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent);
+  color: var(--ui-on-surface);
+}
+
+.tab-item.active .tab-face {
+  color: var(--ui-on-secondary-container);
+  background: var(--ui-secondary-container);
+  font-weight: 650;
+}
+
+/* Gạch chân luôn chiếm chỗ, chỉ đổi màu — nếu để nó xuất hiện/biến mất thì mặt tab nhích
+   lên xuống 2px mỗi lần đổi workspace. */
+.tab-underline {
+  display: none;
+}
+
+.tab-item.active .tab-underline {
+  display: none;
+}
+
+.tab-close,
+.tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  border-radius: var(--r-full);
+  opacity: 0;
+  -webkit-app-region: no-drag;
+  transition: opacity 90ms ease, background 90ms ease;
+}
+/* Nút đóng chỉ hiện khi rê vào đúng tab đó — bốn dấu × nằm sẵn trên thanh là bốn thứ
+   nhấp nháy trong tầm mắt suốt ngày, mà đóng workspace là việc hoạn hữu. */
+.tab-item:hover .tab-close { opacity: 0.75; }
+.tab-close { width: 15px; height: 15px; margin-right: -3px; }
+.tab-add { width: 28px; height: 28px; opacity: 0.62; align-self: center; margin-bottom: 0; }
+.tab-close:hover,
+.tab-add:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-on-surface) 14%, transparent);
+}
+
+.clock-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  border: none;
+  background: color-mix(in srgb, var(--ui-on-surface) 7%, transparent);
+  color: var(--ui-on-surface-variant);
+  font-size: 11.5px;
+  white-space: nowrap;
+  -webkit-app-region: drag;
+}
+
+.clock-pill {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* Nút cửa sổ tròn, không còn là ba ô vuông cao hết thanh dán vào góc phải: thanh đã bo
+   tròn thì ô vuông chạm góc sẽ thò ra ngoài đường cong. */
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  border: none;
+  background: transparent;
+  color: var(--ui-on-surface-variant);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 80ms ease, color 80ms ease;
+}
+.win-btn:hover {
+  background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent);
+  color: var(--ui-on-surface);
+}
+.win-btn.close:hover { background: var(--ui-error); color: var(--ui-on-error); }
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+  padding: var(--gap);
+  /* Dock nổi đè lên canvas nên phải chừa chỗ, nếu không nó che mất đáy terminal. */
+  padding-bottom: calc(var(--dock-h) + var(--gap) * 2);
+}
+
+
+/* ==========================================================================
+   Canvas tiling — panel nằm phẳng, chỉ đổi toạ độ
+   ========================================================================== */
+
+.tiles {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.panel-host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 0;
+  min-height: 0;
+  animation: panel-appear 420ms var(--e-window);
+  /* Hình học được đổi một lần. Kéo-thả dùng View Transition snapshot ở compositor thay
+     vì transition width/height khiến xterm phải reflow ở mỗi frame. */
+  contain: layout paint style;
+}
+
+/* Kéo gutter và kéo panel phải bám tay tức thì — có transition là thành cao su. */
+body.resizing-layout .panel-host,
+body.dragging-panel .panel-host,
+.tiles.is-dragging .panel-host { transition: none; }
+
+/* Panel của workspace khác: vẫn sống, vẫn giữ kích thước, chỉ không nhìn thấy.
+   `display:none` sẽ làm xterm đo được 0×0 rồi fit sai khi quay lại tab. */
+.panel-host.hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.panel-host.drag-source { opacity: 0.42; }
+
+/* Nảy nhẹ lúc mở: 0,88 → vọt qua 1,02 → về 1. `transform` ở đây là `scale` riêng nên
+   không đè lên `translate` định vị panel (`.panel-host` dùng `transform: translate`);
+   vì thế hoạt ảnh chạy trên `.panel` bên trong, không phải trên chính `.panel-host`. */
+@keyframes panel-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes panel-pop {
+  0% { transform: scale(0.96); opacity: 0; }
+  62% { transform: scale(1.006); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.panel-motion {
+  width: 100%;
+  height: 100%;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+.panel-motion.is-moving {
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.panel-host > .panel { transform-origin: center; animation: panel-pop 460ms var(--e-window); }
+
+/* Bóng của panel vừa đóng: co lại rồi tan. Panel thật đã bị bỏ khỏi cây từ trước để
+   những panel còn lại kịp trượt vào chỗ trống ngay. */
+.panel-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.panel-ghost-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-panel);
+  background: color-mix(in srgb, var(--ui-surface-container) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 40%, transparent);
+  animation: panel-vanish 320ms var(--e-window) forwards;
+}
+@keyframes panel-vanish {
+  from { opacity: 0.86; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.94); }
+}
+
+.panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-panel);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 60%, transparent);
+  background: var(--ui-surface-container-lowest);
+  position: relative;
+  transition: border-color 140ms var(--e-standard);
+}
+
+/* U1 — không glow. Panel đang chọn phân biệt bằng viền accent và thanh đầu sáng hơn. */
+.panel-host.on .panel { border-color: var(--ui-primary); }
+.panel-host.on .panel-head { background: var(--ui-surface-container-high); }
+
+/* ── Terminal trong suốt ──────────────────────────────────────────────────
+   Chỉ panel terminal mới trong: explorer và preview là UI dày chữ, để ảnh nền lọt qua
+   thì chỉ tổ khó đọc mà chẳng đẹp thêm.
+
+   Alpha nằm ở *một* lớp duy nhất — màu nền của chính xterm (`--term-bg`). Panel bỏ trống
+   nền, nếu không hai lớp alpha nhân nhau và 85% hoá ra 97,8%, tức là gần như không trong.
+   `backdrop-filter` làm mờ ảnh nền lọt qua; khi đục hẳn thì `--term-backdrop` là `none`
+   nên lớp lọc biến mất luôn khỏi cây vẽ. */
+.panel.terminal-panel {
+  background: transparent;
+  backdrop-filter: var(--term-backdrop, none);
+}
+
+.panel.terminal-panel .panel-head {
+  background: color-mix(
+    in srgb,
+    var(--ui-surface-container-low) calc(var(--term-opacity, 1) * 100%),
+    transparent
+  );
+}
+.panel-host.on .panel.terminal-panel .panel-head {
+  background: color-mix(
+    in srgb,
+    var(--ui-surface-container-high) calc(var(--term-opacity, 1) * 100%),
+    transparent
+  );
+}
+
+/* Terminal header là một tab mảnh, không phải card lồng trong card. Nội dung quan trọng
+   nhất là shell + cwd; các nút layout lui về menu để hàng này giữ được nhịp như ảnh tham chiếu. */
+.panel.terminal-panel .panel-head {
+  height: 32px;
+  margin: 0;
+  padding: 0 8px 0 12px;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-outline-variant) 23%, transparent);
+  border-radius: calc(var(--r-panel) - 1px) calc(var(--r-panel) - 1px) 0 0;
+  gap: 7px;
+}
+.panel.terminal-panel .panel-dot { width: 6px; height: 6px; }
+.panel.terminal-panel .ttl { font-size: 12px; font-weight: 680; }
+.panel.terminal-panel .sub { max-width: min(48vw, 480px); color: var(--ui-on-surface-variant); font-size: 10.5px; }
+.panel.terminal-panel .panel-actions { padding: 0; gap: 0; background: transparent; }
+.panel.terminal-panel .iconbtn { width: 24px; height: 24px; border-radius: var(--r-sm); }
+.panel.terminal-panel .head-chips { max-width: 160px; }
+
+.panel-head {
+  flex: none;
+  height: var(--head-h);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 4px 0;
+  padding: 0 5px 0 10px;
+  color: var(--ui-on-surface-variant);
+  font-size: 11.5px;
+  background: var(--ui-surface-container-low);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 20%, transparent);
+  border-radius: var(--r-md);
+  user-select: none;
+  cursor: grab;
+  touch-action: none;
+  transition: background 140ms var(--e-standard);
+}
+body.dragging-panel .panel-head { cursor: grabbing; }
+
+/* Hàng nút chỉ hiện rõ trên panel đang chọn, hoặc khi rê chuột vào.
+   Mở bốn panel là bốn hàng biểu tượng cùng lúc đập vào mắt — mà mỗi lúc ta chỉ thao tác
+   trên đúng một panel. Vẫn bấm được khi mờ (`pointer-events` không tắt): rê tới là nó
+   hiện trước khi kịp bấm, và trình đo tự động vẫn chạm được. */
+.panel-actions { opacity: 0; transition: opacity 140ms var(--e-standard); }
+.panel-host.on .panel-actions,
+.panel:hover .panel-actions,
+.panel-actions:focus-within { opacity: 1; }
+
+/* Panel hẹp tới mức không còn chỗ cho chữ: chỉ giữ chấm màu và nút `⋯`. */
+.panel-head.minimal { padding: 0 4px 0 7px; gap: 4px; }
+.panel-head.minimal .sp { min-width: 0; }
+
+.head-menu .danger { color: var(--ui-error); }
+.head-menu .danger:hover { background: var(--ui-error-container); color: var(--ui-on-error-container); }
+/* Panel sát mép phải: menu bung ra ngoài canvas sẽ bị cắt, nên neo theo mép phải của nút. */
+.head-menu { max-width: 250px; }
+.head-menu button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.panel-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--r-full);
+  background: var(--ui-outline);
+}
+.panel-dot.dot-term { background: var(--ui-accent-1); }
+.panel-dot.dot-preview { background: var(--ui-accent-6); }
+.panel-dot.dot-explorer { background: var(--ui-accent-3); }
+.panel-dot.dot-web { background: var(--ui-accent-4); }
+.panel-dot.dot-settings { background: var(--ui-accent-5); }
+.panel-dot.dot-system { background: var(--ui-accent-2); }
+
+/* Tiêu đề co được, nút thì không: panel hẹp lại thì chữ bị cắt bớt, còn nút vẫn ở nguyên
+   chỗ của nó. Bản cũ để `flex: none` ở đây nên chính hàng nút bị đẩy tràn ra ngoài. */
+.panel-head .ttl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-on-surface);
+  font-weight: 600;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.panel-head .ttl-icon {
+  display: flex;
+  flex: none;
+  opacity: 0.75;
+}
+.panel-head .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-head .sub {
+  opacity: 0.62;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 220px;
+}
+.panel-head .sp { flex: 1 1 auto; min-width: 6px; }
+
+/* Status dài (đặc biệt lỗi spawn) không được phép nuốt hết hàng thao tác. */
+.head-chips {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 190px;
+  overflow: hidden;
+  flex: 0 1 auto;
+}
+.head-chips .chip {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.head-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 3px;
+  background: color-mix(in srgb, var(--ui-outline-variant) 70%, transparent);
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 2px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ui-surface-container-highest) 72%, transparent);
+}
+
+.iconbtn.move-handle { cursor: grab; }
+body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
+
+/* Đây là **lớp alpha duy nhất** của terminal. Nó phủ đều cả ô chữ, cả phần lề, cả dải
+   thừa nơi lưới ký tự chia không hết — nên không có khung tối nào viền quanh.
+   Bù lại xterm phải tô nền trong suốt hoàn toàn (xem `xtermTheme` trong palette.ts). */
+.term {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 2px 6px 10px;
+  background: var(--term-bg);
+}
+/* xterm cũng đặt nền lên `.xterm-viewport`; để nguyên là chồng thêm một lớp nữa. */
+.term .xterm-viewport { background-color: transparent; }
+.term .xterm-viewport::-webkit-scrollbar { width: 10px; }
+.term .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--ui-outline);
+  border-radius: var(--r-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* ── Đường ngăn ──────────────────────────────────────────────── */
+
+.gutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+/* ── Panel cài đặt ───────────────────────────────────────────────
+   Hai vùng rõ ràng: danh mục nhỏ ở trái, nội dung yên tĩnh ở phải. Mỗi lần chỉ hiện một
+   nhóm nên không còn cảm giác "form quản trị" dài đặc kín như bản cũ. */
+
+.settings-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 178px minmax(0, 1fr);
+  margin: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 36%, transparent);
+  border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--ui-surface-container-low) 82%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-surface) 5%, transparent), var(--shadow-1);
+}
+
+.set-sidebar {
+  min-width: 0;
+  margin: 7px;
+  padding: 16px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  border-radius: calc(var(--r-xl) - 7px);
+  background: color-mix(in srgb, var(--ui-surface-container-high) 56%, transparent);
+}
+
+.set-sidebar-title { padding: 3px 11px 18px; display: flex; flex-direction: column; gap: 4px; }
+.set-sidebar-title > span { font-size: 13px; font-weight: 680; color: var(--ui-on-surface); }
+.set-sidebar-title small { font-size: 10px; line-height: 1.35; color: var(--ui-on-surface-variant); opacity: 0.68; }
+
+.set-nav { display: flex; flex-direction: column; gap: 5px; }
+.set-nav button {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ui-on-surface-variant);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 140ms var(--e-standard), color 140ms var(--e-standard), transform 180ms var(--e-decelerate);
+}
+.set-nav button:hover { background: color-mix(in srgb, var(--ui-on-surface) 7%, transparent); color: var(--ui-on-surface); }
+.set-nav button.on {
+  background: color-mix(in srgb, var(--ui-secondary-container) 82%, transparent);
+  color: var(--ui-on-secondary-container);
+  font-weight: 650;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-secondary-container) 14%, transparent);
+}
+.set-nav button:active { transform: scale(0.97); }
+
+.set-source {
+  margin-top: auto;
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ui-on-surface-variant);
+  font-size: 10px;
+}
+.source-dot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--ui-outline); }
+.source-dot.live { background: var(--ui-tertiary); }
+
+.set-content { min-width: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.set-page {
+  width: min(100%, 780px);
+  margin: 0 auto;
+  padding: 32px clamp(20px, 4vw, 44px) 42px;
+  animation: settings-page-in 260ms var(--e-decelerate) both;
+}
+@keyframes settings-page-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+
+.set-page-head { margin: 0 4px 28px; }
+.set-page-head h2 { font-size: 25px; line-height: 1.15; letter-spacing: -0.04em; color: var(--ui-on-surface); font-weight: 700; }
+.set-page-head p { margin-top: 6px; color: var(--ui-on-surface-variant); font-size: 12px; line-height: 1.5; }
+
+.set-group { margin-top: 28px; }
+.set-group + .set-group { margin-top: 32px; }
+.set-group-head { margin: 0 5px 11px; }
+.set-group-head h3 { font-size: 12px; color: var(--ui-on-surface); font-weight: 680; }
+.set-group-head p { margin-top: 3px; color: var(--ui-on-surface-variant); font-size: 10.5px; line-height: 1.45; opacity: 0.72; }
+
+.set-list {
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--ui-surface-container-high) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 34%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-surface) 5%, transparent);
+}
+.set-item {
+  min-height: 60px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--ui-on-surface);
+  transition: background 160ms var(--e-standard);
+}
+.set-item:hover { background: color-mix(in srgb, var(--ui-on-surface) 4%, transparent); }
+.set-item + .set-item,
+.set-item + .set-tip,
+.set-tip + .set-item { border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 17%, transparent); }
+.set-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.set-label { font-size: 12.5px; font-weight: 520; color: var(--ui-on-surface); }
+.set-copy small { font-size: 10.5px; color: var(--ui-on-surface-variant); line-height: 1.4; opacity: 0.7; }
+
+.set-choice { align-items: flex-start; flex-direction: column; gap: 10px; padding-top: 15px; padding-bottom: 15px; }
+.set-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.set-chip,
+.set-btn {
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 46%, transparent);
+  background: color-mix(in srgb, var(--ui-surface-container-lowest) 46%, transparent);
+  color: var(--ui-on-surface-variant);
+  border-radius: var(--r-full);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 180ms var(--e-decelerate);
+}
+.set-chip:hover, .set-btn:hover { background: var(--ui-surface-container-highest); color: var(--ui-on-surface); border-color: transparent; }
+.set-chip:active, .set-btn:active { transform: scale(0.96); }
+.set-chip.on { background: var(--ui-primary-container); border-color: transparent; color: var(--ui-on-primary-container); font-weight: 650; }
+
+.set-slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 16px; padding-top: 11px; padding-bottom: 11px; }
+.set-slider input[type="range"] { grid-column: 1 / -1; width: 100%; height: 16px; margin: 0; accent-color: var(--ui-primary); background: transparent; }
+/* Thanh trượt bị chế độ khác chiếm quyền: vẫn đọc được giá trị đang có hiệu lực, nhưng
+   nói rõ bằng mắt rằng kéo cũng không ăn thua — dòng `note` bên dưới nói lý do. */
+.set-slider.off { opacity: 0.55; }
+.set-slider.off input[type="range"] { cursor: not-allowed; }
+.set-val {
+  align-self: center;
+  min-width: 44px;
+  padding: 4px 8px;
+  border-radius: var(--r-full);
+  background: var(--ui-surface-container-highest);
+  color: var(--ui-on-surface-variant);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.set-switch { position: relative; width: 42px; height: 24px; flex: none; }
+.set-switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.set-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  background: var(--ui-surface-container-highest);
+  border: 1px solid var(--ui-outline);
+  pointer-events: none;
+  transition: background 180ms var(--e-standard), border-color 180ms var(--e-standard);
+}
+.set-switch-track > span {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  border-radius: var(--r-full);
+  background: var(--ui-outline);
+  transition: transform 220ms var(--e-decelerate), background 180ms var(--e-standard);
+}
+.set-switch input:checked + .set-switch-track { background: var(--ui-primary); border-color: var(--ui-primary); }
+.set-switch input:checked + .set-switch-track > span { transform: translateX(18px); background: var(--ui-on-primary); }
+.set-switch input:focus-visible + .set-switch-track { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+
+.set-tip { padding: 13px 16px; color: var(--ui-on-surface-variant); font-size: 10.5px; line-height: 1.55; background: color-mix(in srgb, var(--ui-tertiary-container) 28%, transparent); }
+.set-keylist { display: flex; flex-direction: column; }
+.set-key { min-height: 40px; padding: 7px 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.set-key + .set-key { border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 22%, transparent); }
+.set-key-what { min-width: 0; color: var(--ui-on-surface-variant); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-key-combo { display: flex; gap: 3px; justify-content: flex-end; flex: none; }
+.settings-shell kbd {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 3px 6px;
+  border-radius: var(--r-xs);
+  background: var(--ui-surface-container-highest);
+  color: var(--ui-on-surface);
+  white-space: nowrap;
+}
+
+@media (max-width: 540px) {
+  .settings-shell { grid-template-columns: 52px minmax(0, 1fr); }
+  .set-sidebar { padding-inline: 7px; }
+  .set-sidebar-title, .set-source, .set-nav button span { display: none; }
+  .set-nav button { justify-content: center; padding: 0; }
+  .set-page { padding-inline: 14px; }
+}
+
+.gutter.row { cursor: col-resize; }
+.gutter.col { cursor: row-resize; }
+
+.gutter-grip {
+  border-radius: var(--r-full);
+  background: transparent;
+  transition: background 130ms var(--e-standard), width 130ms var(--e-standard),
+    height 130ms var(--e-standard);
+}
+.gutter.row .gutter-grip { width: 3px; height: 26px; }
+.gutter.col .gutter-grip { width: 26px; height: 3px; }
+
+.gutter:hover .gutter-grip { background: color-mix(in srgb, var(--ui-primary) 65%, transparent); }
+.gutter.active .gutter-grip { background: var(--ui-primary); }
+.gutter.active.row .gutter-grip { height: 52px; }
+.gutter.active.col .gutter-grip { width: 52px; }
+
+body.resizing-layout,
+body.resizing-layout * {
+  user-select: none !important;
+}
+/* iframe của panel web nuốt sạch pointer event, làm rơi cả lượt kéo lẫn lượt chỉnh kích
+   thước ngay khi con trỏ lướt qua nó. Tắt trong lúc thao tác là cách duy nhất giữ được. */
+body.resizing-layout canvas,
+body.resizing-layout iframe,
+body.dragging-panel canvas,
+body.dragging-panel iframe {
+  pointer-events: none !important;
+}
+body.dragging-panel,
+body.dragging-panel * {
+  user-select: none !important;
+  cursor: grabbing !important;
+}
+
+/* ── Kéo thả: ô xem trước và bóng theo con trỏ ───────────────── */
+
+.drop-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-panel);
+  border: 2px solid var(--ui-primary);
+  background: color-mix(in srgb, var(--ui-primary) 20%, transparent);
+  transition: transform 110ms var(--e-standard), width 110ms var(--e-standard),
+    height 110ms var(--e-standard);
+}
+.drop-indicator.swap {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--ui-tertiary) 20%, transparent);
+  border-color: var(--ui-tertiary);
+}
+
+.drop-badge {
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.drop-indicator.swap .drop-badge {
+  background: var(--ui-tertiary);
+  color: var(--ui-on-tertiary);
+}
+
+.drag-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 70;
+  margin: 14px 0 0 14px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: var(--r-full);
+  background: var(--ui-surface-container-highest);
+  border: 1px solid var(--ui-outline-variant);
+  color: var(--ui-on-surface);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.drag-ghost-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--ui-primary);
+}
+
+/* ── Trạng thái rỗng ────────────────────────────────────────── */
+
+.empty-workspace {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 34px 38px;
+  border-radius: var(--r-xl);
+  background: var(--ui-surface-container-low);
+  border: 1px solid var(--ui-outline-variant);
+  max-width: 430px;
+  width: 100%;
+}
+.empty-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: var(--r-lg);
+  background: var(--ui-surface-container-high);
+  color: var(--ui-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.empty-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ui-on-surface);
+  margin-bottom: 6px;
+}
+.empty-card p {
+  font-size: 13px;
+  color: var(--ui-on-surface-variant);
+  margin-bottom: 20px;
+}
+.empty-actions { display: flex; gap: 10px; width: 100%; }
+.empty-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  border: none;
+  border-radius: var(--r-full);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms var(--e-standard);
+}
+.empty-btn.primary { background: var(--ui-primary); color: var(--ui-on-primary); }
+.empty-btn.primary:hover { background: var(--ui-primary-container); color: var(--ui-on-primary-container); }
+.empty-btn.secondary { background: var(--ui-surface-container-high); color: var(--ui-on-surface); }
+.empty-btn.secondary:hover { background: var(--ui-surface-container-highest); }
+.empty-hints {
+  margin-top: 18px;
+  font-size: 11px;
+  color: var(--ui-on-surface-variant);
+  opacity: 0.8;
+}
+.empty-hints kbd {
+  font-family: var(--font-mono);
+  padding: 2px 5px;
+  border-radius: var(--r-xs);
+  background: var(--ui-surface-container-highest);
+}
+
+/* ==========================================================================
+   Dock nổi ở đáy
+   ========================================================================== */
+
+.dock-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--gap);
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Dock tự ẩn.
+   `.dock-wrap` để `pointer-events: none` nên nó không chắn canvas, nhưng `:hover` vẫn
+   lan lên tổ tiên khi con trỏ chạm `.dock-hot` — nhờ đó một dải 16px sát đáy đủ để gọi
+   dock lên, dù dock đã trượt hẳn ra ngoài màn hình. */
+.dock-wrap.auto .dock {
+  transform: translateY(calc(100% + var(--gap) * 2));
+  opacity: 0;
+  transition:
+    transform 260ms var(--e-emphasized),
+    opacity 180ms var(--e-standard);
+}
+.dock-wrap.auto:hover .dock {
+  transform: none;
+  opacity: 1;
+}
+.dock-hot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--gap) * -1);
+  height: 32px;
+  pointer-events: auto;
+}
+.dock-wrap.auto:hover .dock-hot {
+  pointer-events: none;
+}
+/* Dock ẩn thì canvas lấy lại chỗ nó chừa sẵn. */
+.app.dock-auto .canvas { padding-bottom: var(--gap); }
+
+.dock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--ui-surface-container) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 60%, transparent);
+  backdrop-filter: blur(26px) saturate(150%);
+  pointer-events: auto;
+  user-select: none;
+}
+
+/* Ô đặc, mỗi ô một màu — đây là nét nhận dạng của dock trong ảnh tham chiếu.
+   Tô nhạt rồi mới đặc khi rê chuột thì dock trông xám xịt, mất hẳn cái vui đó. */
+.dock-item {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--tile);
+  color: var(--on-tile);
+  cursor: pointer;
+  transition: transform 180ms var(--e-emphasized), filter 140ms var(--e-standard);
+}
+
+.dock-item:hover {
+  animation: dock-jiggle 340ms var(--e-bounce) both;
+  filter: brightness(1.12);
+}
+.dock-item:active { transform: translateY(-2px) scale(0.98); }
+
+@keyframes dock-jiggle {
+  0%   { transform: translateY(0) scale(1) rotate(0); }
+  55%  { transform: translateY(-7px) scale(1.08) rotate(-1.2deg); }
+  78%  { transform: translateY(-5px) scale(1.06) rotate(0.8deg); }
+  100% { transform: translateY(-6px) scale(1.08) rotate(0); }
+}
+
+.dock-tip {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 5px 11px;
+  border-radius: var(--r-full);
+  background: var(--ui-inverse-surface);
+  color: var(--ui-inverse-on-surface);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 130ms var(--e-standard), transform 130ms var(--e-standard);
+}
+.dock-item:hover .dock-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ==========================================================================
+   Nút bấm dùng chung
+   ========================================================================== */
+
+.iconbtn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--r-xs);
+  color: var(--ui-on-surface-variant);
+  display: grid;
+  place-items: center;
+  transition: background 110ms ease, color 110ms ease;
+}
+.iconbtn:hover {
+  background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent);
+  color: var(--ui-on-surface);
+}
+.iconbtn.close:hover { background: var(--ui-error); color: var(--ui-on-error); }
+.iconbtn.on {
+  background: color-mix(in srgb, var(--ui-primary) 22%, transparent);
+  color: var(--ui-primary);
+}
+
+.chip {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--ui-surface-container-high);
+  color: var(--ui-on-surface-variant);
+}
+.chip.ok { background: var(--ui-secondary-container); color: var(--ui-on-secondary-container); }
+.chip.err { background: var(--ui-error-container); color: var(--ui-on-error-container); }
+.chip.run { background: var(--ui-tertiary-container); color: var(--ui-on-tertiary-container); }
+
+.head-menu-wrap { position: relative; }
+
+/* `fixed` + portal ra body: menu của panel hẹp phải vượt ra ngoài được, panel có
+   `overflow: hidden` nên nằm trong đó là bị xén. Toạ độ do PanelHeader tính. */
+.head-menu {
+  position: fixed;
+  z-index: 300;
+  min-width: 216px;
+  padding: 6px;
+  border-radius: var(--r-lg);
+  background: var(--ui-surface-container-highest);
+  border: 1px solid var(--ui-outline-variant);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.head-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  color: var(--ui-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 80ms ease;
+}
+.head-menu button span { flex: 1; }
+.head-menu button kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+.head-menu button:hover { background: var(--ui-surface-container-high); }
+
+.notice {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--dock-h) + var(--gap) * 2);
+  transform: translateX(-50%);
+  z-index: 95;
+  padding: 8px 16px;
+  border-radius: var(--r-full);
+  background: var(--ui-error-container);
+  color: var(--ui-on-error-container);
+  font-size: 12px;
+}
+
+/* ── Preview Panels (Phase 05) ─────────────────────────────────── */
+.preview-panel .pv { background: var(--ui-surface-container-lowest); }
+
+
+
+
+
+
+
+
+.pv {
+  flex: 1; min-height: 0; overflow: auto; padding: 12px 14px;
+}
+
+.pv-loading {
+  height: 100%; display: grid; place-items: center; color: var(--ui-on-surface-variant); font-size: 12px;
+}
+
+.pv-err {
+  padding: 12px; border-radius: 8px;
+  background: var(--ui-error-container); color: var(--ui-on-error-container);
+  font-size: 12px;
+}
+
+.pv-image-container {
+  height: 100%; display: flex; align-items: center; justify-content: center; overflow: auto;
+}
+.pv-img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  border-radius: 8px; border: 1px solid var(--ui-outline-variant);
+  background: var(--ui-surface-container-low);
+}
+
+.pv-raw {
+  font-family: var(--font-mono);
+  font-size: 12px; line-height: 1.5; color: var(--ui-on-surface-variant);
+  white-space: pre-wrap; word-break: break-all;
+}
+
+/* Markdown formatting */
+.md {
+  font-size: 13px; line-height: 1.65; color: var(--ui-on-surface-variant); max-width: 72ch;
+}
+.md h1 { font-size: 18px; color: var(--ui-on-surface); margin: 4px 0 12px; font-weight: 600; }
+.md h2 { font-size: 15px; color: var(--ui-on-surface); margin: 16px 0 8px; font-weight: 600; }
+.md h3 { font-size: 13.5px; color: var(--ui-on-surface); margin: 12px 0 6px; font-weight: 600; }
+.md p { margin: 8px 0; }
+.md code {
+  font-family: var(--font-mono); font-size: 11.5px;
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--ui-surface-container-high); color: var(--ui-tertiary);
+}
+.md pre {
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.45;
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--ui-surface-container-low); border: 1px solid var(--ui-outline-variant);
+  overflow-x: auto; margin: 10px 0; color: var(--ui-on-surface);
+}
+.md pre code {
+  padding: 0; background: transparent; color: inherit;
+}
+.md blockquote {
+  padding-left: 12px; margin: 8px 0;
+  border-left: 3px solid var(--ui-primary); color: var(--ui-on-surface-variant);
+}
+.md ul { margin: 8px 0 8px 20px; }
+.md li { margin: 4px 0; }
+.md hr {
+  border: none; border-top: 1px solid var(--ui-outline-variant); margin: 16px 0;
+}
+.md a { color: var(--ui-primary); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md .ins { color: var(--ui-ansi-green); }
+.md .del { color: var(--ui-error); }
+.md .dim { opacity: .6; }
+
+/* Diff formatting */
+.diff-table {
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.45;
+  border-radius: 8px; overflow: hidden; border: 1px solid var(--ui-outline-variant);
+  background: var(--ui-surface-container-lowest);
+}
+.diff-row {
+  display: flex; align-items: baseline; min-height: 20px; padding: 1px 0;
+}
+.diff-row.hunk {
+  background: var(--ui-surface-container-high); color: var(--ui-tertiary); font-weight: 500;
+  padding: 2px 8px;
+}
+.diff-row.meta {
+  background: var(--ui-surface-container-low); color: var(--ui-on-surface-variant); opacity: .75;
+  padding: 2px 8px;
+}
+.diff-row.add {
+  background: color-mix(in srgb, var(--ui-ansi-green) 14%, transparent);
+  color: var(--ui-on-surface);
+}
+.diff-row.del {
+  background: color-mix(in srgb, var(--ui-error) 14%, transparent);
+  color: var(--ui-on-surface);
+}
+.diff-num {
+  width: 36px; flex: none; text-align: right; padding-right: 8px;
+  color: var(--ui-outline); user-select: none; font-size: 10.5px;
+}
+.diff-sign {
+  width: 16px; flex: none; text-align: center; user-select: none; font-weight: bold;
+}
+.diff-row.add .diff-sign { color: var(--ui-ansi-green); }
+.diff-row.del .diff-sign { color: var(--ui-error); }
+.diff-code {
+  flex: 1; white-space: pre-wrap; word-break: break-all; padding-right: 8px;
+}
+
+/* ==========================================================================
+   Phase 08: Command Palette (U1: No glow, surface layers only. U2: Round soft)
+   ========================================================================== */
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--ui-background) 55%, transparent);
+  backdrop-filter: blur(14px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.palette-modal {
+  width: 580px;
+  max-width: 90vw;
+  background: var(--ui-surface-container-high);
+  border: 1px solid var(--ui-outline-variant);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--ui-outline-variant);
+  color: var(--ui-on-surface-variant);
+}
+
+.palette-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font: 14px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: var(--ui-on-surface);
+}
+
+.palette-input::placeholder {
+  color: var(--ui-on-surface-variant);
+  opacity: 0.6;
+}
+
+.palette-kbd {
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--ui-surface-container);
+  border: 1px solid var(--ui-outline-variant);
+  color: var(--ui-on-surface-variant);
+}
+
+.palette-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.palette-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--ui-on-surface-variant);
+  font-size: 13px;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 80ms ease;
+  user-select: none;
+}
+
+.palette-item.selected,
+.palette-item:hover {
+  background: var(--ui-surface-container-highest);
+}
+
+.palette-item-cat {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ui-surface-container-low);
+  color: var(--ui-on-surface-variant);
+  flex: none;
+}
+
+.palette-item-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ui-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-item-shortcut {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--ui-surface-container-lowest);
+  border: 1px solid var(--ui-outline-variant);
+  color: var(--ui-on-surface-variant);
+  flex: none;
+}
+
+
+
+/* ==========================================================================
+   Explorer — trình duyệt tệp
+   ========================================================================== */
+
+.ex-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-outline-variant) 45%, transparent);
+}
+
+.ex-crumbs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ex-crumbs::-webkit-scrollbar { display: none; }
+
+.ex-crumb {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--ui-on-surface-variant);
+  font-size: 11.5px;
+  padding: 3px 7px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 90ms ease, color 90ms ease;
+}
+.ex-crumb:hover { background: var(--ui-surface-container-high); color: var(--ui-on-surface); }
+.ex-crumb + .ex-crumb::before {
+  content: "›";
+  margin-right: 6px;
+  opacity: 0.45;
+}
+
+.ex-filter {
+  flex: none;
+  width: 110px;
+  border: none;
+  outline: none;
+  background: var(--ui-surface-container);
+  color: var(--ui-on-surface);
+  border-radius: var(--r-full);
+  height: 22px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11.5px;
+}
+.ex-filter::placeholder { color: var(--ui-on-surface-variant); opacity: 0.6; }
+
+.ex-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.ex-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 9px;
+  border: none;
+  background: transparent;
+  color: var(--ui-on-surface-variant);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-size: 12.5px;
+  transition: background 80ms ease;
+}
+.ex-row:hover { background: var(--ui-surface-container-high); color: var(--ui-on-surface); }
+.ex-icon { display: flex; flex: none; color: var(--ui-on-surface-variant); opacity: 0.8; }
+.ex-row.dir .ex-icon { color: var(--ui-accent-3); opacity: 1; }
+.ex-row.dir .ex-name { color: var(--ui-on-surface); font-weight: 500; }
+.ex-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-meta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Web — panel duyệt web
+   ========================================================================== */
+
+.web-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: var(--ui-on-surface-variant);
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-outline-variant) 45%, transparent);
+}
+.web-bar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: var(--ui-surface-container);
+  color: var(--ui-on-surface);
+  border-radius: var(--r-full);
+  height: 24px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+}
+.web-bar input::placeholder { color: var(--ui-on-surface-variant); opacity: 0.6; }
+
+.web-view { flex: 1; min-height: 0; position: relative; background: var(--ui-surface-container-lowest); }
+.web-view iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  background: var(--ui-surface-container-lowest);
+}
+
+.web-start {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  color: var(--ui-on-surface-variant);
+  font-size: 12.5px;
+}
+.web-quick { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.web-quick button {
+  border: 1px solid var(--ui-outline-variant);
+  background: var(--ui-surface-container);
+  color: var(--ui-on-surface);
+  border-radius: var(--r-full);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 90ms ease;
+}
+.web-quick button:hover { background: var(--ui-surface-container-highest); }
+.web-open-default {
+  min-height: 32px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 160ms var(--e-decelerate), filter 120ms var(--e-standard);
+}
+.web-open-default:hover { filter: brightness(1.06); }
+.web-open-default:active { transform: scale(0.97); }
+.web-note { max-width: 42ch; font-size: 11px; opacity: 0.65; line-height: 1.5; }
+
+/* ===========================================================================
+   Hệ thống — sysfetch kiểu neofetch
+   =========================================================================== */
+
+.sysfetch-container {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: start center;
+  align-items: flex-start;
+  gap: clamp(16px, 2.5vw, 36px);
+  padding: clamp(16px, 2.5vw, 32px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--term-bg);
+  color: var(--ui-on-surface);
+  font: 400 clamp(10.5px, 1.1vw, 12.5px)/1.52 var(--font-mono);
+}
+
+.sysfetch-main {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(12px, 2vw, 24px);
+}
+
+.sysfetch-main pre { font: inherit; }
+
+.sysfetch-stack {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.sysfetch-main .line {
+  display: block;
+  animation: sysfetch-line 260ms var(--e-decelerate) both;
+  animation-delay: calc(var(--i, 0) * 26ms);
+}
+@keyframes sysfetch-line {
+  from { opacity: 0; transform: translateX(-7px); }
+  to { opacity: 1; transform: none; }
+}
+
+.sysfetch-logo {
+  flex: none;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 0.92;
+  font-size: clamp(10px, 1.25vw, 14px);
+}
+.sysfetch-logo .line {
+  color: color-mix(in oklab, var(--ui-primary) calc(100% - var(--i, 0) * 4%), var(--ui-tertiary));
+}
+.sysfetch-logo .rule { margin-top: 0.8em; color: var(--ui-tertiary); }
+
+.sysfetch-wave {
+  width: min(100%, 590px);
+  margin: 0;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 40%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-outline-variant) 24%, transparent);
+  color: var(--ui-primary);
+  font: 700 10px/0.78 var(--font-mono);
+  letter-spacing: 0.08ch;
+  animation: sysfetch-wave-in 300ms var(--e-decelerate) both;
+}
+@keyframes sysfetch-wave-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.sysfetch-out {
+  min-width: 0;
+  white-space: pre-wrap;
+}
+.sysfetch-out b { color: var(--ui-primary); font-weight: 700; }
+.sysfetch-out .head { color: var(--ui-on-surface-variant); }
+.sysfetch-out .rule { color: var(--ui-outline); }
+
+.sysfetch-out .meter {
+  position: relative;
+  display: inline-block;
+  margin-left: 1ch;
+  vertical-align: baseline;
+  white-space: pre;
+  color: color-mix(in srgb, var(--ui-on-surface) 26%, transparent);
+}
+.sysfetch-out .meter .fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--p, 0%);
+  overflow: hidden;
+  white-space: pre;
+  color: var(--ui-primary);
+  transition: width 900ms linear;
+}
+
+.sysfetch-out .graph {
+  display: flex;
+  gap: 1.5ch;
+  align-items: baseline;
+  white-space: pre;
+  line-height: 1.25;
+}
+.sysfetch-out .graph.first { margin-top: 1.2em; }
+.sysfetch-out .graph .cells { color: var(--ui-primary); letter-spacing: 0; }
+.sysfetch-out .graph .now { color: var(--ui-on-surface-variant); }
+
+.sysfetch-out .caret {
+  display: block;
+  margin-top: 1em;
+  color: var(--ui-primary);
+  animation: sysfetch-caret 1.06s steps(1, end) infinite;
+}
+@keyframes sysfetch-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (max-width: 620px) {
+  .sysfetch-main { flex-direction: column; gap: 14px; }
+  .sysfetch-logo { font-size: 0.78em; }
+}
+
+/* ==========================================================================
+   Menu chuột phải
+   ========================================================================== */
+
+/* Nằm ngoài mọi panel (portal ra `body`) nên `z-index` phải trên cả dock lẫn thanh trên. */
+.ctx-menu {
+  position: fixed;
+  z-index: 900;
+  min-width: 224px;
+  padding: 5px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--ui-surface-container-high) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 45%, transparent);
+  backdrop-filter: blur(24px) saturate(140%);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.34);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: ctx-in 110ms var(--e-decelerate);
+}
+
+@keyframes ctx-in {
+  from { opacity: 0; transform: translateY(-3px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ui-on-surface);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+
+/* Vạch ngăn vẽ bằng `margin` + `border-top` của chính mục, không phải một thẻ riêng —
+   thêm phần tử rỗng vào giữa danh sách thì điều hướng bằng bàn phím sau này phải né nó. */
+.ctx-item[data-sep] {
+  margin-top: 5px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 40%, transparent);
+  border-radius: 0 0 var(--r-sm) var(--r-sm);
+}
+
+.ctx-item:hover:not(:disabled) { background: var(--ui-surface-container-highest); }
+.ctx-item:disabled { opacity: 0.38; cursor: default; }
+
+.ctx-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  flex: none;
+  color: var(--ui-on-surface-variant);
+}
+
+.ctx-label { flex: 1; min-width: 0; }
+
+/* ==========================================================================
+   Thu hẹp cửa sổ — gọn lại, không được mất nút
+   ========================================================================== */
+
+/* Cửa sổ hẹp thì tên workspace cắt bớt, icon và gạch chân thì giữ. */
+@media (max-width: 820px) {
+  .tab-item .tab-name { max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Hẹp nữa thì tab còn mỗi icon — vẫn phân biệt được nhờ icon gán cứng theo workspace. */
+@media (max-width: 560px) {
+  .tab-item .tab-name { display: none; }
+  .tab-face { padding: 0 7px; }
+}
+/* Hẹp nữa thì bỏ đồng hồ và tên app — nút cửa sổ và tab thì không bao giờ bỏ. */
+@media (max-width: 680px) {
+  .clock-pill { display: none; }
+  .brand .brand-name { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Bề mặt phẳng — `surfaceStyle: "flat"`, mặc định của bảng màu Tethys
+
+   Logo không có một pixel nào giả vờ là thuỷ tinh: nó là những mảng màu phẳng cạnh sắc
+   nằm cạnh nhau. Khối này dịch đúng điều đó sang chrome, và **chỉ** làm ba việc —
+   bỏ blur, bỏ độ trong, siết viền. Bo góc, khoảng cách, nhịp chữ giữ nguyên của bản gốc,
+   vì đó là hình khối chứ không phải chất liệu.
+
+   Vì sao là lớp override cuối file chứ không sửa thẳng các rule trên? Vì bề mặt kính vẫn
+   phải chạy được nguyên vẹn khi người dùng chọn lại nó ở Cài đặt. Một style bật tắt được
+   thì phải cộng vào, không được ăn mất đường cũ.
+   ========================================================================== */
+
+/* Không còn ảnh nền phía sau, nên chính `.app` là mặt nền duy nhất người dùng thấy. */
+.app.surface-flat { background: var(--ui-background); }
+
+/* Blur là thứ đắt nhất trong cả cây vẽ, và ở đây nó chẳng còn gì để làm mờ. */
+.app.surface-flat .tb-bar,
+.app.surface-flat .dock,
+.app.surface-flat .ctx-menu,
+.app.surface-flat .palette-backdrop,
+.app.surface-flat .panel.terminal-panel {
+  backdrop-filter: none;
+}
+
+/* Bề mặt đặc hẳn. Viền lên đủ 100% `outline-variant`: khi đã bỏ bóng và bỏ blur thì đường
+   viền là thứ *duy nhất* còn lại để tách hai mảng cùng tông — nhạt nữa là mất tầng. */
+.app.surface-flat .tb-bar,
+.app.surface-flat .dock {
+  background: var(--ui-surface-container);
+  border-color: var(--ui-outline-variant);
+}
+
+.app.surface-flat .panel { border-color: var(--ui-outline-variant); }
+
+/* Panel đang chọn: viền teal đủ dày để thấy từ khoé mắt mà vẫn không phải hào quang (U1). */
+.app.surface-flat .panel-host.on .panel {
+  border-color: var(--ui-primary);
+  box-shadow: inset 0 0 0 1px var(--ui-primary);
+}
+
+.app.surface-flat .ctx-menu {
+  background: var(--ui-surface-container-high);
+  border-color: var(--ui-outline-variant);
+  box-shadow: var(--shadow-1);
+}
+
+/* Bảng lệnh vẫn phải làm chìm thứ phía sau, nhưng bằng độ đục chứ không bằng blur. */
+.app.surface-flat .palette-backdrop {
+  background: color-mix(in srgb, var(--ui-background) 82%, transparent);
+}
+
+.app.surface-flat .settings-shell {
+  background: var(--ui-surface-container-low);
+  box-shadow: none;
+}
+
+/* Thanh trên ở chế độ tự ẩn không còn cần mờ đi để lộ ảnh nền — nó chỉ cần trượt lên. */
+.app.surface-flat.nav-auto .titlebar { opacity: 1; }

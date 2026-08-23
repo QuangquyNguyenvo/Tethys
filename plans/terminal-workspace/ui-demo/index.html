@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terminal Workspace — UI demo</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   UI DEMO — mockup tĩnh, KHÔNG phải code sản phẩm.
+   Mục đích: chốt tham số thiết kế đang khoá phase 03/04/05/08/10.
+   Màu ở đây sinh bằng oklch() cho demo chạy offline. Code thật dùng
+   @material/material-color-utilities (HCT) — xem PROJECT_CONTEXT §7.2.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* shape scale M3 — §7.3 */
+  --r-xs:4px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:28px; --r-full:9999px;
+  /* motion — §7.4 */
+  --e-emph:cubic-bezier(.2,0,0,1);
+  --e-dec:cubic-bezier(.05,.7,.1,1);
+  --e-acc:cubic-bezier(.3,0,.8,.15);
+  --d-short:150ms; --d-med:320ms; --d-long:520ms;
+  /* tham số demo điều chỉnh được */
+  --gap:12px; --panel-r:var(--r-xl); --blur:20px; --term-alpha:.92; --chrome-alpha:.62;
+  --ui:"Rubik","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --mono:"CaskaydiaCove Nerd Font","Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--ui);
+  background:var(--wallpaper);
+  color:var(--onSurface);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── shell cửa sổ: decorations tắt, custom titlebar (§7.6) ───────── */
+.win{height:100vh;display:flex;flex-direction:column}
+
+.titlebar{
+  height:40px;flex:none;display:flex;align-items:center;gap:6px;
+  padding:0 4px 0 12px;
+  color:var(--onSurfaceVariant);
+  user-select:none;
+}
+.brand{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;
+  color:var(--onSurface);padding-right:8px}
+.brand .dot{width:9px;height:9px;border-radius:var(--r-full);background:var(--primary)}
+
+.tabs{display:flex;gap:4px;align-items:center}
+.tab{
+  display:flex;align-items:center;gap:7px;height:28px;padding:0 13px;
+  border-radius:var(--r-full);border:none;cursor:pointer;
+  font:inherit;font-size:12.5px;
+  background:transparent;color:var(--onSurfaceVariant);
+  transition:background var(--d-short) var(--e-emph),color var(--d-short) var(--e-emph);
+}
+.tab:hover{background:color-mix(in oklab,var(--onSurface) 8%,transparent)}
+.tab[aria-selected="true"]{background:var(--secondaryContainer);color:var(--onSecondaryContainer)}
+.tab .idx{font-size:10.5px;opacity:.6;font-variant-numeric:tabular-nums}
+.tab-add{width:28px;height:28px;display:grid;place-items:center;border-radius:var(--r-full);
+  border:none;background:transparent;color:var(--onSurfaceVariant);cursor:pointer}
+.tab-add:hover{background:color-mix(in oklab,var(--onSurface) 8%,transparent)}
+
+.drag{flex:1;height:100%}
+.wctl{display:flex}
+.wctl button{
+  width:44px;height:36px;border:none;background:transparent;cursor:pointer;
+  color:var(--onSurfaceVariant);display:grid;place-items:center;border-radius:var(--r-sm);
+  transition:background var(--d-short) var(--e-emph);
+}
+.wctl button:hover{background:color-mix(in oklab,var(--onSurface) 10%,transparent)}
+.wctl button.close:hover{background:var(--error);color:var(--onError)}
+
+/* ── canvas tiling (§7.1: panel nổi, có khe) ─────────────────────── */
+.canvas{
+  flex:1;min-height:0;display:grid;
+  grid-template-columns:1.35fr .95fr;
+  gap:var(--gap);padding:0 var(--gap) var(--gap);
+}
+.col{display:grid;grid-template-rows:1.15fr .85fr;gap:var(--gap);min-height:0}
+
+.panel{
+  position:relative;min-height:0;display:flex;flex-direction:column;overflow:hidden;
+  border-radius:var(--panel-r);
+  border:1px solid var(--outlineVariant);
+  background:color-mix(in oklab,var(--surfaceContainerLow) calc(var(--chrome-alpha)*100%),transparent);
+  backdrop-filter:blur(var(--blur));
+  transition:border-color var(--d-med) var(--e-emph),background var(--d-med) var(--e-emph),
+             border-radius var(--d-med) var(--e-emph);
+}
+.panel.focus{border-color:color-mix(in oklab,var(--primary) 55%,var(--outlineVariant))}
+/* §7.7 #2 — panel terminal ĐỤC HƠN HẲN panel chrome */
+.panel.term{background:color-mix(in oklab,var(--surfaceContainerLowest) calc(var(--term-alpha)*100%),transparent)}
+
+.phead{
+  flex:none;height:34px;display:flex;align-items:center;gap:8px;
+  padding:0 6px 0 14px;font-size:12px;color:var(--onSurfaceVariant);
+}
+.phead .ttl{display:flex;align-items:center;gap:7px;font-weight:500;color:var(--onSurface)}
+.phead .sub{opacity:.62;font-size:11.5px;font-family:var(--mono)}
+.phead .sp{flex:1}
+.chip{
+  height:22px;padding:0 9px;display:inline-flex;align-items:center;gap:5px;
+  border-radius:var(--r-full);font-size:10.5px;letter-spacing:.02em;
+  background:var(--primaryContainer);color:var(--onPrimaryContainer);
+}
+.chip.run{background:var(--tertiaryContainer);color:var(--onTertiaryContainer)}
+.chip.run .dot{width:6px;height:6px;border-radius:var(--r-full);background:currentColor;
+  animation:pulse 1.6s var(--e-emph) infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+.iconbtn{
+  width:26px;height:26px;border:none;background:transparent;cursor:pointer;border-radius:var(--r-sm);
+  color:var(--onSurfaceVariant);display:grid;place-items:center;
+  transition:background var(--d-short) var(--e-emph);
+}
+.iconbtn:hover{background:color-mix(in oklab,var(--onSurface) 10%,transparent)}
+
+/* ── terminal + command decorations kiểu VS Code (§5) ─────────────── */
+.term-body{
+  flex:1;min-height:0;overflow:auto;padding:2px 14px 14px 0;
+  font-family:var(--mono);font-size:15px;line-height:1.5;
+}
+.term-body::-webkit-scrollbar{width:10px}
+.term-body::-webkit-scrollbar-thumb{background:var(--outlineVariant);border-radius:var(--r-full);
+  border:3px solid transparent;background-clip:content-box}
+
+.blk{position:relative;padding-left:16px}
+.blk:hover .blk-act{opacity:1;transform:none}
+/* gutter mark — VS Code style, KHÔNG phải khung card kiểu Warp */
+.blk::before{
+  content:"";position:absolute;left:6px;top:.45em;width:3px;height:1.05em;border-radius:var(--r-full);
+  background:var(--gutter,var(--outline));
+}
+.blk.ok{--gutter:var(--ansi-green)}
+.blk.err{--gutter:var(--error)}
+.blk.run{--gutter:var(--tertiary)}
+.blk-act{
+  position:absolute;right:0;top:0;display:flex;gap:2px;opacity:0;
+  transform:translateX(4px);
+  transition:opacity var(--d-short) var(--e-emph),transform var(--d-short) var(--e-emph);
+}
+.blk-act button{
+  height:22px;padding:0 8px;border-radius:var(--r-sm);border:1px solid var(--outlineVariant);
+  background:var(--surfaceContainerHigh);color:var(--onSurfaceVariant);
+  font:inherit;font-size:10.5px;font-family:var(--ui);cursor:pointer;
+}
+.blk-act button:hover{background:var(--surfaceContainerHighest);color:var(--onSurface)}
+.cmd{color:var(--onSurface)}
+.cmd .ps1{color:var(--primary)}
+.cmd .arrow{color:var(--tertiary)}
+.out{color:var(--onSurfaceVariant);white-space:pre-wrap}
+.badge{
+  display:inline-block;margin-left:8px;padding:0 6px;border-radius:var(--r-xs);
+  font-size:10px;font-family:var(--ui);vertical-align:1px;
+}
+.badge.ok{background:color-mix(in oklab,var(--ansi-green) 22%,transparent);color:var(--ansi-green)}
+.badge.err{background:var(--errorContainer);color:var(--onErrorContainer)}
+.badge.t{background:color-mix(in oklab,var(--onSurface) 10%,transparent);color:var(--onSurfaceVariant)}
+
+.tui{
+  margin:6px 0 2px;padding:10px 12px;border-radius:var(--r-md);
+  border:1px solid color-mix(in oklab,var(--tertiary) 35%,var(--outlineVariant));
+  background:color-mix(in oklab,var(--tertiary) 7%,transparent);
+  color:var(--onSurfaceVariant);
+}
+.tui b{color:var(--tertiary);font-weight:600}
+.caret{display:inline-block;width:7px;height:1.05em;vertical-align:-2px;background:var(--primary);
+  animation:blink 1.1s steps(1) infinite}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+.g{color:var(--ansi-green)}.r{color:var(--ansi-red)}.y{color:var(--ansi-yellow)}
+.b{color:var(--ansi-blue)}.m{color:var(--ansi-magenta)}.c{color:var(--ansi-cyan)}
+.dim{opacity:.55}
+
+/* ── preview panels (§ phase 05) ──────────────────────────────────── */
+.pv{flex:1;min-height:0;overflow:auto;padding:0 14px 14px}
+.pv img,.pv .fig{width:100%;border-radius:var(--r-md);border:1px solid var(--outlineVariant);display:block}
+.md{font-size:13px;line-height:1.65;color:var(--onSurfaceVariant);max-width:62ch}
+.md h1{font-size:17px;color:var(--onSurface);margin:2px 0 10px;font-weight:600}
+.md h2{font-size:13.5px;color:var(--onSurface);margin:16px 0 7px;font-weight:600}
+.md p{margin:8px 0}
+.md code{font-family:var(--mono);font-size:11.5px;padding:1px 5px;border-radius:var(--r-xs);
+  background:var(--surfaceContainerHigh);color:var(--tertiary)}
+.md pre{font-family:var(--mono);font-size:11.5px;padding:11px 13px;border-radius:var(--r-md);
+  background:var(--surfaceContainerLowest);border:1px solid var(--outlineVariant);
+  overflow-x:auto;margin:10px 0;color:var(--onSurfaceVariant)}
+.md ul{margin:8px 0 8px 18px}
+.md li{margin:4px 0}
+.md a{color:var(--primary)}
+.md .ins{color:var(--ansi-green)}
+.md .del{color:var(--ansi-red)}
+
+/* ── command palette (§ phase 08) ─────────────────────────────────── */
+.scrim{
+  position:fixed;inset:0;background:color-mix(in oklab,#000 45%,transparent);
+  display:grid;place-items:start center;padding-top:12vh;z-index:50;
+  opacity:0;pointer-events:none;transition:opacity var(--d-med) var(--e-emph);
+}
+.scrim.on{opacity:1;pointer-events:auto}
+.cp{
+  width:min(620px,88vw);border-radius:var(--r-xl);overflow:hidden;
+  background:var(--surfaceContainerHigh);border:1px solid var(--outlineVariant);
+  box-shadow:0 18px 50px -12px rgba(0,0,0,.55);
+  transform:translateY(-14px) scale(.97);
+  transition:transform var(--d-med) var(--e-dec);
+}
+.scrim.on .cp{transform:none}
+.cp-in{display:flex;align-items:center;gap:11px;padding:15px 18px;
+  border-bottom:1px solid var(--outlineVariant);color:var(--onSurfaceVariant)}
+.cp-in input{flex:1;border:none;background:transparent;outline:none;font:inherit;font-size:14.5px;
+  color:var(--onSurface)}
+.cp-in input::placeholder{color:var(--onSurfaceVariant);opacity:.7}
+.cp-list{max-height:46vh;overflow:auto;padding:8px}
+.cp-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r-md);
+  cursor:pointer;color:var(--onSurfaceVariant);font-size:13px}
+.cp-item .k{margin-left:auto;font-family:var(--mono);font-size:10.5px;opacity:.65;
+  border:1px solid var(--outlineVariant);border-radius:var(--r-xs);padding:1px 6px}
+.cp-item[aria-selected="true"]{background:var(--secondaryContainer);color:var(--onSecondaryContainer)}
+.cp-sec{padding:10px 12px 5px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--onSurfaceVariant);opacity:.65}
+
+/* ── bảng điều khiển demo (không thuộc app thật) ──────────────────── */
+.dev{
+  position:fixed;right:14px;bottom:14px;width:302px;z-index:40;
+  border-radius:var(--r-xl);border:1px solid var(--outlineVariant);
+  background:var(--surfaceContainerHigh);
+  box-shadow:0 14px 40px -14px rgba(0,0,0,.6);
+  font-size:12px;color:var(--onSurfaceVariant);
+  transform-origin:bottom right;
+  transition:transform var(--d-med) var(--e-emph),opacity var(--d-med) var(--e-emph);
+}
+.dev.hide{transform:scale(.92) translateY(8px);opacity:0;pointer-events:none}
+.dev h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.7;
+  padding:14px 16px 2px;font-weight:600}
+.dev .row{display:flex;align-items:center;gap:10px;padding:7px 16px}
+.dev .row label{flex:1;white-space:nowrap}
+.dev .row output{font-family:var(--mono);font-size:10.5px;width:46px;text-align:right;opacity:.75}
+.dev input[type=range]{width:118px;accent-color:var(--primary)}
+.dev select{background:var(--surfaceContainerHighest);color:var(--onSurface);font:inherit;font-size:11.5px;
+  border:1px solid var(--outlineVariant);border-radius:var(--r-sm);padding:4px 7px}
+.seg{display:flex;gap:4px;padding:4px 16px 10px;flex-wrap:wrap}
+.seg button{
+  height:28px;padding:0 12px;border-radius:var(--r-full);cursor:pointer;font:inherit;font-size:11.5px;
+  border:1px solid var(--outlineVariant);background:transparent;color:var(--onSurfaceVariant);
+  transition:all var(--d-short) var(--e-emph);
+}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--onPrimary);border-color:transparent}
+.swatches{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;padding:2px 16px 16px}
+.swatches i{height:17px;border-radius:var(--r-xs);display:block}
+.devtoggle{
+  position:fixed;right:14px;bottom:14px;z-index:41;width:46px;height:46px;border-radius:var(--r-full);
+  border:none;cursor:pointer;background:var(--primaryContainer);color:var(--onPrimaryContainer);
+  display:grid;place-items:center;box-shadow:0 8px 22px -8px rgba(0,0,0,.6);
+  transition:transform var(--d-short) var(--e-emph);
+}
+.devtoggle:hover{transform:scale(1.06)}
+.note{padding:0 16px 14px;font-size:10.5px;line-height:1.5;opacity:.6}
+</style>
+</head>
+<body>
+
+<div class="win">
+  <header class="titlebar">
+    <div class="brand"><span class="dot"></span> noname</div>
+    <div class="tabs">
+      <button class="tab" aria-selected="true"><span class="idx">1</span> noname</button>
+      <button class="tab"><span class="idx">2</span> api-server</button>
+      <button class="tab"><span class="idx">3</span> scratch</button>
+      <button class="tab-add" title="Workspace mới">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+    <div class="drag"></div>
+    <div class="wctl">
+      <button title="Command palette (Ctrl+K)" id="cpBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      </button>
+      <button><svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg></button>
+      <button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg></button>
+      <button class="close"><svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+  </header>
+
+  <main class="canvas">
+
+    <!-- ══ PANEL TERMINAL ══ -->
+    <section class="panel term focus">
+      <div class="phead">
+        <span class="ttl">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-5-6-5M12 19h8"/></svg>
+          pwsh
+        </span>
+        <span class="sub">D:\Code\Project\noname</span>
+        <span class="sp"></span>
+        <span class="chip run"><span class="dot"></span> claude</span>
+        <button class="iconbtn" title="Chia dọc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></button>
+        <button class="iconbtn" title="Đóng"><svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="term-body">
+
+        <div class="blk ok">
+          <div class="blk-act"><button>Copy output</button><button>Rerun</button></div>
+          <div class="cmd"><span class="ps1">noname</span> <span class="arrow">❯</span> npm run build<span class="badge ok">0 · 4.2s</span></div>
+<div class="out">vite v6.0.3 <span class="dim">building for production...</span>
+✓ 214 modules transformed.
+dist/index.html                 <span class="c">0.46 kB</span>
+dist/assets/index-B7xQ.css     <span class="c">18.30 kB</span>
+dist/assets/index-Ck2p.js     <span class="c">142.71 kB</span>
+<span class="g">✓ built in 4.21s</span></div>
+        </div>
+
+        <div class="blk err">
+          <div class="blk-act"><button>Copy output</button><button>Rerun</button></div>
+          <div class="cmd"><span class="ps1">noname</span> <span class="arrow">❯</span> cargo test --release<span class="badge err">exit 101</span></div>
+<div class="out"><span class="g">   Compiling</span> noname v0.1.0 (D:\Code\Project\noname\app\src-tauri)
+<span class="r">error[E0308]</span>: mismatched types
+  <span class="b">--&gt;</span> src/pty/session.rs:84:31
+   <span class="b">|</span>
+84 <span class="b">|</span>         channel.send(buf.clone())
+   <span class="b">|</span>                 <span class="r">^^^^^^^^^^^</span> expected `Vec&lt;u8&gt;`, found `String`</div>
+        </div>
+
+        <div class="blk run">
+          <div class="blk-act"><button>Copy output</button></div>
+          <div class="cmd"><span class="ps1">noname</span> <span class="arrow">❯</span> claude<span class="badge t">alt screen · 12m</span></div>
+          <div class="tui">
+            <b>✻ Claude Code</b> <span class="dim">· opus-5 · D:\Code\Project\noname</span><br><br>
+            <span class="g">●</span> Đã sửa <span class="c">src/pty/session.rs:84</span> — gửi <span class="c">Vec&lt;u8&gt;</span> thay vì <span class="c">String</span>.<br>
+            <span class="g">●</span> Sinh biểu đồ throughput → <span class="c">bench/throughput.png</span><br><br>
+            <span class="dim">╭──────────────────────────────────────────────╮</span><br>
+            <span class="dim">│</span> <span class="m">&gt;</span> chạy lại bench với buffer 16ms<span class="caret"></span>       <span class="dim">│</span><br>
+            <span class="dim">╰──────────────────────────────────────────────╯</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ══ CỘT PREVIEW ══ -->
+    <div class="col">
+
+      <section class="panel">
+        <div class="phead">
+          <span class="ttl">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-9 9"/></svg>
+            throughput.png
+          </span>
+          <span class="sub">bench/</span>
+          <span class="sp"></span>
+          <span class="chip">auto-refresh</span>
+          <button class="iconbtn" title="Mở bằng app ngoài"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></button>
+        </div>
+        <div class="pv">
+          <svg class="fig" viewBox="0 0 420 208" preserveAspectRatio="none" style="background:var(--surfaceContainerLowest)">
+            <g stroke="var(--outlineVariant)" stroke-width="1">
+              <line x1="44" y1="24" x2="404" y2="24"/><line x1="44" y1="66" x2="404" y2="66"/>
+              <line x1="44" y1="108" x2="404" y2="108"/><line x1="44" y1="150" x2="404" y2="150"/>
+              <line x1="44" y1="176" x2="404" y2="176"/>
+            </g>
+            <g font-size="8" fill="var(--onSurfaceVariant)" opacity=".7" font-family="monospace">
+              <text x="12" y="27">80</text><text x="12" y="69">60</text>
+              <text x="12" y="111">40</text><text x="12" y="153">20</text>
+              <text x="52" y="192">4ms</text><text x="140" y="192">8ms</text>
+              <text x="228" y="192">16ms</text><text x="316" y="192">32ms</text>
+            </g>
+            <path d="M60 148 L148 78 L236 40 L324 34 L392 33" fill="none" stroke="var(--primary)" stroke-width="2.4" stroke-linejoin="round"/>
+            <path d="M60 148 L148 78 L236 40 L324 34 L392 33 L392 176 L60 176 Z" fill="var(--primary)" opacity=".14"/>
+            <path d="M60 168 L148 152 L236 120 L324 74 L392 44" fill="none" stroke="var(--tertiary)" stroke-width="2" stroke-dasharray="5 4"/>
+            <g fill="var(--primary)">
+              <circle cx="60" cy="148" r="3"/><circle cx="148" cy="78" r="3"/><circle cx="236" cy="40" r="3"/>
+              <circle cx="324" cy="34" r="3"/><circle cx="392" cy="33" r="3"/>
+            </g>
+            <g font-size="8.5" font-family="monospace">
+              <rect x="248" y="8" width="10" height="3" fill="var(--primary)"/>
+              <text x="264" y="13" fill="var(--onSurfaceVariant)">MB/s</text>
+              <rect x="310" y="8" width="10" height="3" fill="var(--tertiary)"/>
+              <text x="326" y="13" fill="var(--onSurfaceVariant)">RAM đỉnh</text>
+            </g>
+          </svg>
+          <div style="display:flex;gap:8px;margin-top:10px;font-size:11px;color:var(--onSurfaceVariant)">
+            <span class="chip" style="background:var(--surfaceContainerHighest);color:var(--onSurfaceVariant)">1440×720</span>
+            <span class="chip" style="background:var(--surfaceContainerHighest);color:var(--onSurfaceVariant)">86 KB</span>
+            <span class="chip" style="background:var(--surfaceContainerHighest);color:var(--onSurfaceVariant)">14:03:22</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="phead">
+          <span class="ttl">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>
+            session.rs
+          </span>
+          <span class="sub">src-tauri/src/pty/</span>
+          <span class="sp"></span>
+          <span class="chip" style="background:color-mix(in oklab,var(--ansi-green) 20%,transparent);color:var(--ansi-green)">+12 −4</span>
+          <button class="iconbtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></button>
+        </div>
+        <div class="pv">
+          <div class="md">
+            <h2>Diff — gom buffer trước khi gửi</h2>
+<pre>  <span class="dim">let mut buf = Vec::with_capacity(8192);</span>
+  <span class="dim">loop {</span>
+<span class="del">-     channel.send(String::from_utf8_lossy(&amp;buf).into())?;</span>
+<span class="ins">+     if last.elapsed() &gt;= FLUSH {</span>
+<span class="ins">+         channel.send(std::mem::take(&amp;mut buf))?;</span>
+<span class="ins">+         last = Instant::now();</span>
+<span class="ins">+     }</span>
+  <span class="dim">}</span></pre>
+            <p>Bất biến <b>#5</b> của <code>CONTEXT.md</code>: PTY output phải gom buffer ở Rust rồi gửi
+            <b>binary</b> qua <code>Channel</code>. Không <code>emit()</code> JSON mỗi chunk.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ══ COMMAND PALETTE ══ -->
+<div class="scrim" id="scrim">
+  <div class="cp">
+    <div class="cp-in">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input placeholder="Gõ lệnh, tên file, hoặc lịch sử…" id="cpInput">
+      <span style="font-family:var(--mono);font-size:10.5px;opacity:.55">Esc</span>
+    </div>
+    <div class="cp-list">
+      <div class="cp-sec">Panel</div>
+      <div class="cp-item" aria-selected="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg> Chia panel theo chiều dọc <span class="k">Ctrl ⇧ D</span></div>
+      <div class="cp-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 12h18"/></svg> Chia panel theo chiều ngang <span class="k">Ctrl ⇧ E</span></div>
+      <div class="cp-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-9 9"/></svg> Mở preview cho file… <span class="k">Ctrl P</span></div>
+      <div class="cp-sec">Terminal</div>
+      <div class="cp-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg> Nhảy tới command trước <span class="k">Ctrl ↑</span></div>
+      <div class="cp-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg> Nhảy tới command sau <span class="k">Ctrl ↓</span></div>
+      <div class="cp-sec">Giao diện</div>
+      <div class="cp-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Đổi wallpaper &amp; sinh lại palette</div>
+      <div class="cp-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/></svg> Bật/tắt compact mode</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BẢNG ĐIỀU KHIỂN DEMO ══ -->
+<button class="devtoggle" id="devToggle" title="Bảng điều khiển demo">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 00.33 1.76l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.6 1.6 0 00-2.72 1.13V21a2 2 0 11-4 0v-.1A1.6 1.6 0 007 19.4a1.6 1.6 0 00-1.76.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.6 1.6 0 002.6 15H2.5a2 2 0 110-4h.1A1.6 1.6 0 004.6 7a1.6 1.6 0 00-.33-1.76l-.06-.06a2 2 0 112.83-2.83l.06.06A1.6 1.6 0 009 2.6h.1a2 2 0 114 0v.1a1.6 1.6 0 002.72 1.13l.06-.06a2 2 0 112.83 2.83l-.06.06A1.6 1.6 0 0021.4 9h.1a2 2 0 110 4h-.1a1.6 1.6 0 00-1.13 2z"/></svg>
+</button>
+
+<aside class="dev hide" id="dev">
+  <h3>Dynamic color — §7.2</h3>
+  <div class="row"><label>Seed hue (từ wallpaper)</label><input type="range" id="hue" min="0" max="360" value="268"><output id="hueO">268</output></div>
+  <div class="row"><label>Scheme variant</label>
+    <select id="scheme">
+      <option>TonalSpot</option><option>Vibrant</option><option>Expressive</option>
+      <option>Neutral</option><option>Content</option><option>Monochrome</option>
+    </select>
+  </div>
+  <div class="seg">
+    <button id="dark" aria-pressed="true">Dark</button>
+    <button id="light" aria-pressed="false">Light</button>
+  </div>
+  <div class="row" style="padding-top:0"><label style="opacity:.7">ANSI 16 sinh từ palette</label></div>
+  <div class="row"><label>Bão hoà ANSI</label><input type="range" id="sat" min="40" max="300" value="170"><output id="satO">1.70×</output></div>
+  <div class="row"><label>Kéo hue về seed</label><input type="range" id="harm" min="0" max="60" value="18"><output id="harmO">18%</output></div>
+  <div class="swatches" id="sw"></div>
+
+  <h3>Xung đột §7.7 — đường lui</h3>
+  <div class="row"><label>Gap giữa panel</label><input type="range" id="gap" min="0" max="24" value="12"><output id="gapO">12px</output></div>
+  <div class="row"><label>Bo góc panel</label><input type="range" id="rad" min="0" max="36" value="28"><output id="radO">28px</output></div>
+  <div class="row"><label>Blur nền</label><input type="range" id="blur" min="0" max="40" value="20"><output id="blurO">20px</output></div>
+  <div class="row"><label>Đục — panel terminal</label><input type="range" id="ta" min="30" max="100" value="92"><output id="taO">92%</output></div>
+  <div class="row"><label>Đục — panel chrome</label><input type="range" id="ca" min="20" max="100" value="62"><output id="caO">62%</output></div>
+  <div class="seg"><button id="compact">Compact mode</button><button id="opaque">Tắt hết blur</button></div>
+  <div class="note">Nền cửa sổ ở đây giả lập Mica bằng gradient sinh từ seed hue. App thật dùng
+    <code>window-vibrancy</code>. Ctrl+K mở command palette.</div>
+</aside>
+
+<script>
+/* ── M3 tone → OKLCH lightness ───────────────────────────────────────
+   Tone của M3 chính là L* (CIELAB). Đổi L* → Y → OKLab L (= Y^⅓ với xám).
+   Xấp xỉ đủ tốt cho demo; code thật dùng HCT của material-color-utilities. */
+const okL = t => {
+  const fy = (t + 16) / 116;
+  const Y = fy > 6/29 ? fy**3 : 3 * (6/29)**2 * (fy - 4/29);
+  return Math.cbrt(Math.max(0, Y));
+};
+const tone = (h, c) => t => `oklch(${(okL(t)*100).toFixed(2)}% ${c} ${((h%360)+360)%360})`;
+
+/* hue offset + chroma cho từng palette, theo scheme variant */
+const SCHEMES = {
+  TonalSpot : {p:[0,.090], s:[0,.034], t:[ 60,.074], n:[0,.006], nv:[0,.015]},
+  Vibrant   : {p:[0,.165], s:[0,.058], t:[ 80,.115], n:[0,.010], nv:[0,.022]},
+  Expressive: {p:[240,.120], s:[300,.066], t:[ 15,.105], n:[15,.010], nv:[15,.022]},
+  Neutral   : {p:[0,.028], s:[0,.018], t:[  0,.022], n:[0,.004], nv:[0,.010]},
+  Content   : {p:[0,.130], s:[0,.066], t:[ 45,.100], n:[0,.008], nv:[0,.019]},
+  Monochrome: {p:[0,0],    s:[0,0],    t:[  0,0],    n:[0,0],    nv:[0,0]}
+};
+
+/* hue harmonization: kéo hue ANSI về phía seed một phần — đây là chỗ làm
+   terminal trông cùng một khối với UI thay vì lạc quẻ (§7.2) */
+const harmonize = (h, to, amt) => {
+  const d = ((to - h + 540) % 360) - 180;
+  return (h + d * amt + 360) % 360;
+};
+const ANSI = {red:25, green:145, yellow:95, blue:255, magenta:320, cyan:200};
+
+const S = {hue:268, scheme:'TonalSpot', dark:true, sat:1.7, harm:.18};
+
+function apply(){
+  const s = SCHEMES[S.scheme], d = S.dark, h = S.hue, r = document.documentElement;
+  const P  = tone(h + s.p[0],  s.p[1]);
+  const Se = tone(h + s.s[0],  s.s[1]);
+  const T  = tone(h + s.t[0],  s.t[1]);
+  const N  = tone(h + s.n[0],  s.n[1]);
+  const NV = tone(h + s.nv[0], s.nv[1]);
+  const E  = tone(25, S.scheme === 'Monochrome' ? 0 : .150);
+
+  const set = (k, v) => r.style.setProperty('--' + k, v);
+  const pair = (name, F, on, cont, onCont) => {
+    set(name, F(on)); set('on' + name[0].toUpperCase() + name.slice(1), F(cont));
+    set(name + 'Container', F(onCont[0])); set('on' + name[0].toUpperCase() + name.slice(1) + 'Container', F(onCont[1]));
+  };
+  pair('primary',   P,  d?80:40, d?20:100, d?[30,90]:[90,10]);
+  pair('secondary', Se, d?80:40, d?20:100, d?[30,90]:[90,10]);
+  pair('tertiary',  T,  d?80:40, d?20:100, d?[30,90]:[90,10]);
+  pair('error',     E,  d?80:40, d?20:100, d?[30,90]:[90,10]);
+
+  set('surface',                d ? N(6)  : N(98));
+  set('onSurface',              d ? N(90) : N(10));
+  set('surfaceVariant',         d ? NV(30): NV(90));
+  set('onSurfaceVariant',       d ? NV(80): NV(30));
+  set('outline',                d ? NV(60): NV(50));
+  set('outlineVariant',         d ? NV(30): NV(80));
+  set('surfaceContainerLowest', d ? N(4)  : N(100));
+  set('surfaceContainerLow',    d ? N(10) : N(96));
+  set('surfaceContainer',       d ? N(12) : N(94));
+  set('surfaceContainerHigh',   d ? N(17) : N(92));
+  set('surfaceContainerHighest',d ? N(22) : N(90));
+
+  /* ANSI 16 — hue semantics giữ nguyên, kéo 18% về seed, tone/chroma theo palette */
+  const cN = Math.max(s.p[1] * .95, s.p[1] ? .06 : 0) * S.sat;
+  const tn = d ? 72 : 46, tb = d ? 84 : 58;
+  const sw = [];
+  set('ansi-black',        d ? N(22) : N(30));  sw.push(d ? N(22) : N(30));
+  for (const k in ANSI) {
+    const hh = harmonize(ANSI[k], h, S.harm);
+    set('ansi-' + k, tone(hh, cN)(tn)); sw.push(tone(hh, cN)(tn));
+  }
+  set('ansi-white',        d ? NV(80): NV(40)); sw.push(d ? NV(80) : NV(40));
+  set('ansi-brightBlack',  d ? N(40) : N(50));  sw.push(d ? N(40) : N(50));
+  for (const k in ANSI) {
+    const hh = harmonize(ANSI[k], h, S.harm);
+    set('ansi-bright' + k, tone(hh, cN * 1.08)(tb)); sw.push(tone(hh, cN * 1.08)(tb));
+  }
+  set('ansi-brightWhite',  d ? N(95) : N(20));  sw.push(d ? N(95) : N(20));
+
+  document.getElementById('sw').innerHTML = sw.map(c => `<i style="background:${c}"></i>`).join('');
+
+  /* wallpaper giả lập — app thật: Mica qua window-vibrancy (§7.6) */
+  set('wallpaper',
+    `radial-gradient(1200px 800px at 12% 8%,  ${tone(h,     s.p[1]*1.5)(d?26:88)}, transparent 62%),
+     radial-gradient(1000px 900px at 88% 92%, ${tone(h+70,  s.p[1]*1.3)(d?20:84)}, transparent 60%),
+     radial-gradient(900px 700px at 70% 12%,  ${tone(h-60,  s.p[1]*1.1)(d?16:90)}, transparent 58%),
+     ${d ? N(4) : N(96)}`);
+}
+
+/* ── điều khiển demo ─────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const bind = (id, out, fmt, cssVar) => $(id).addEventListener('input', e => {
+  const v = e.target.value;
+  $(out).textContent = fmt(v);
+  document.documentElement.style.setProperty(cssVar, fmt(v));
+});
+bind('gap',  'gapO',  v => v + 'px', '--gap');
+bind('rad',  'radO',  v => v + 'px', '--panel-r');
+bind('blur', 'blurO', v => v + 'px', '--blur');
+$('ta').addEventListener('input', e => { $('taO').textContent = e.target.value + '%';
+  document.documentElement.style.setProperty('--term-alpha', e.target.value / 100); });
+$('ca').addEventListener('input', e => { $('caO').textContent = e.target.value + '%';
+  document.documentElement.style.setProperty('--chrome-alpha', e.target.value / 100); });
+
+$('hue').addEventListener('input', e => { S.hue = +e.target.value; $('hueO').textContent = e.target.value; apply(); });
+$('scheme').addEventListener('change', e => { S.scheme = e.target.value; apply(); });
+$('sat').addEventListener('input', e => { S.sat = e.target.value / 100; $('satO').textContent = S.sat.toFixed(2) + '×'; apply(); });
+$('harm').addEventListener('input', e => { S.harm = e.target.value / 100; $('harmO').textContent = e.target.value + '%'; apply(); });
+$('dark').addEventListener('click', () => { S.dark = true;  $('dark').ariaPressed = 'true';  $('light').ariaPressed = 'false'; apply(); });
+$('light').addEventListener('click', () => { S.dark = false; $('dark').ariaPressed = 'false'; $('light').ariaPressed = 'true';  apply(); });
+
+let compact = false;
+$('compact').addEventListener('click', () => {
+  compact = !compact; $('compact').ariaPressed = String(compact);
+  const v = compact ? {gap:2, rad:8, blur:0} : {gap:12, rad:28, blur:20};
+  for (const [k, id] of [['gap','gap'], ['rad','rad'], ['blur','blur']]) {
+    $(id).value = v[k]; $(id).dispatchEvent(new Event('input'));
+  }
+});
+let opaque = false;
+$('opaque').addEventListener('click', () => {
+  opaque = !opaque; $('opaque').ariaPressed = String(opaque);
+  $('blur').value = opaque ? 0 : 20;  $('blur').dispatchEvent(new Event('input'));
+  $('ta').value   = opaque ? 100 : 92; $('ta').dispatchEvent(new Event('input'));
+  $('ca').value   = opaque ? 100 : 62; $('ca').dispatchEvent(new Event('input'));
+});
+$('devToggle').addEventListener('click', () => $('dev').classList.toggle('hide'));
+
+/* command palette */
+const scrim = $('scrim');
+const openCP = () => { scrim.classList.add('on'); $('cpInput').focus(); };
+const closeCP = () => scrim.classList.remove('on');
+$('cpBtn').addEventListener('click', openCP);
+scrim.addEventListener('click', e => { if (e.target === scrim) closeCP(); });
+addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); scrim.classList.contains('on') ? closeCP() : openCP(); }
+  if (e.key === 'Escape') closeCP();
+});
+document.querySelectorAll('.cp-item').forEach(el => el.addEventListener('mouseenter', () => {
+  document.querySelectorAll('.cp-item').forEach(x => x.ariaSelected = 'false');
+  el.ariaSelected = 'true';
+}));
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.ariaSelected = 'false');
+  t.ariaSelected = 'true';
+}));
+
+apply();
+</script>
+</body>
+</html>
