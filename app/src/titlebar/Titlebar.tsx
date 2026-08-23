@@ -76,13 +76,15 @@ export function Titlebar({
   const [time, setTime] = useState<string>("");
 
   useEffect(() => {
+    let timer = 0;
     const updateTime = () => {
       const d = new Date();
       setTime(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }));
+      // Mặt đồng hồ chỉ hiện tới phút: canh đúng biên phút thay vì render cả titlebar mỗi giây.
+      timer = window.setTimeout(updateTime, 60_000 - (Date.now() % 60_000) + 25);
     };
     updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const icons = useMemo(() => tabs.map((t) => iconFor(t.id)), [tabs]);

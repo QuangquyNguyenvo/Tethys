@@ -13,6 +13,10 @@ export type CommandBlock = {
   commandText?: string;
 };
 
+// xterm giữ 10.000 dòng scrollback; metadata cũ hơn phần đó không còn nội dung để nhảy
+// tới hoặc copy nữa. Chặn mảng này tăng vô hạn trong những terminal chạy nhiều ngày.
+const MAX_COMMAND_BLOCKS = 512;
+
 export class Osc133Tracker {
   private blocks: CommandBlock[] = [];
   private currentBlock: Partial<CommandBlock> | null = null;
@@ -113,6 +117,9 @@ export class Osc133Tracker {
 
           const completed = this.currentBlock as CommandBlock;
           this.blocks.push(completed);
+          if (this.blocks.length > MAX_COMMAND_BLOCKS) {
+            this.blocks.splice(0, this.blocks.length - MAX_COMMAND_BLOCKS);
+          }
           this.currentBlock = null;
 
           this.onRunningChange?.(null);

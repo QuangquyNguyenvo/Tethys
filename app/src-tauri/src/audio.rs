@@ -43,6 +43,7 @@ struct MediaState {
 }
 
 static MEDIA_STATE: OnceLock<Arc<Mutex<MediaState>>> = OnceLock::new();
+static MEDIA_CONSUMERS: AtomicUsize = AtomicUsize::new(0);
 
 fn state() -> Arc<Mutex<AudioState>> {
     STATE
@@ -90,6 +91,32 @@ fn audio_is_active() -> bool {
     AUDIO_CONSUMERS.load(Ordering::Relaxed) > 0
 }
 
+/// WinRT media enumeration is only needed while a visible sysfetch panel can show it.
+#[tauri::command]
+pub fn media_set_active(active: bool) {
+    if active {
+        MEDIA_CONSUMERS.fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+
+    let mut current = MEDIA_CONSUMERS.load(Ordering::Relaxed);
+    while current != 0 {
+        match MEDIA_CONSUMERS.compare_exchange_weak(
+            current,
+            current - 1,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return,
+            Err(next) => current = next,
+        }
+    }
+}
+
+fn media_is_active() -> bool {
+    MEDIA_CONSUMERS.load(Ordering::Relaxed) > 0
+}
+
 /// Metadata lấy từ Windows media session (Spotify, trình duyệt, MusicBee, ...).
 /// Worker tách riêng để lời gọi từ giao diện luôn trả ngay, không bị chờ WinRT.
 #[tauri::command]
@@ -118,6 +145,10 @@ fn media_forever(state: Arc<Mutex<MediaState>>) {
         return;
     }
     loop {
+        if !media_is_active() {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            continue;
+        }
         let next = current_media().ok().flatten();
         let mut guard = state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(now_playing) = next {

@@ -89,10 +89,16 @@ impl WatcherManager {
             }
             None => false,
         };
+        let no_paths_left = paths.is_empty();
         if should_unwatch {
             let mut w_lock = self.watcher.lock().map_err(|e| e.to_string())?;
             if let Some(ref mut watcher) = *w_lock {
                 let _ = watcher.unwatch(&p);
+            }
+            // notify owns an OS watcher thread. Drop it after the final preview closes;
+            // ensure_watcher recreates it transparently the next time a file is opened.
+            if no_paths_left {
+                *w_lock = None;
             }
         }
         Ok(())

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 
 console.log("=== KIEM TRA OSC 133 PARSER (G2) ===");
+const MAX_COMMAND_BLOCKS = 512;
 
 class MockTerminal {
   constructor() {
@@ -71,6 +72,9 @@ class TestOsc133Tracker {
           this.currentBlock.exitCode = isNaN(exitCode) ? 0 : exitCode;
           this.currentBlock.status = exitCode === 0 ? "success" : "error";
           this.blocks.push(this.currentBlock);
+          if (this.blocks.length > MAX_COMMAND_BLOCKS) {
+            this.blocks.splice(0, this.blocks.length - MAX_COMMAND_BLOCKS);
+          }
           this.currentBlock = null;
         }
         break;
@@ -115,5 +119,15 @@ assert.equal(tracker.blocks.length, 2);
 assert.equal(tracker.blocks[1].status, "error");
 assert.equal(tracker.blocks[1].exitCode, 101);
 console.log("PASS: Command 2 (Error exit 101) ->", tracker.blocks[1]);
+
+// Metadata must remain bounded in terminals that stay open for days.
+for (let index = 0; index < 600; index += 1) {
+  mockTerm.cursorY = index + 6;
+  tracker.handleOsc133("A");
+  tracker.handleOsc133("D;0");
+}
+assert.equal(tracker.blocks.length, MAX_COMMAND_BLOCKS);
+assert.equal(tracker.blocks.at(-1).id, "cmd_602");
+console.log(`PASS: Command metadata remains capped at ${MAX_COMMAND_BLOCKS} blocks`);
 
 console.log("\n>>> TAT CA TEST OSC 133 DEU PASS (G2) <<<");

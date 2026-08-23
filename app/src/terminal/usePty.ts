@@ -4,13 +4,37 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { ImageAddon } from "@xterm/addon-image";
 import type { ITheme } from "@xterm/xterm";
 import { registerFileLinkProvider } from "./links";
 import { Osc133Tracker, type CommandBlock } from "./osc133";
 import { useSessions } from "../store/sessions";
 
 export type PtyState = "starting" | "running" | "exited" | "error";
+
+const HIDDEN_WEBGL_RELEASE_MS = 700;
+const IMAGE_PROTOCOL_MARKERS = [
+  new Uint8Array([0x1b, 0x50, 0x71]), // SIXEL: ESC P q
+  new Uint8Array([0x1b, 0x5d, 0x31, 0x33, 0x33, 0x37, 0x3b, 0x46, 0x69, 0x6c, 0x65, 0x3d]),
+];
+
+/** Nhận diện SIXEL/iTerm image kể cả khi escape sequence bị cắt giữa hai PTY chunk. */
+function containsImageProtocol(data: Uint8Array, states: number[]): boolean {
+  for (const byte of data) {
+    for (let index = 0; index < IMAGE_PROTOCOL_MARKERS.length; index += 1) {
+      const marker = IMAGE_PROTOCOL_MARKERS[index];
+      let state = states[index];
+      if (byte === marker[state]) state += 1;
+      else state = byte === marker[0] ? 1 : 0;
+
+      if (state === marker.length) {
+        states[index] = 0;
+        return true;
+      }
+      states[index] = state;
+    }
+  }
+  return false;
+}
 
 export type PtyOptions = {
   shell?: string;
@@ -46,6 +70,8 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
   const flushRef = useRef<() => void>(() => {});
   const termRef = useRef<Terminal | null>(null);
   const trackerRef = useRef<Osc133Tracker | null>(null);
+  const webglRef = useRef<WebglAddon | null>(null);
+  const visibilityHandlerRef = useRef<(visible: boolean) => void>(() => undefined);
 
   useEffect(() => {
     // Không đặt guard "đã mount rồi thì thôi": StrictMode chạy mount → cleanup →
@@ -75,23 +101,25 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
     const uni = new Unicode11Addon();
     term.loadAddon(uni);
     term.unicode.activeVersion = "11";
-    // Ảnh inline từ các công cụ tương thích SIXEL hoặc iTerm Inline Image Protocol.
-    // Giới hạn có chủ đích: mỗi panel giữ tối đa 32 MB ảnh để scrollback không ăn RAM vô hạn.
-    term.loadAddon(new ImageAddon({
-      pixelLimit: 4_194_304,
-      storageLimit: 32,
-      sixelSizeLimit: 8_000_000,
-      iipSizeLimit: 8_000_000,
-    }));
-
     term.open(host.current);
-    try {
-      const gl = new WebglAddon();
-      gl.onContextLoss(() => gl.dispose());
-      term.loadAddon(gl);
-    } catch {
-      // Không có WebGL thì xterm tự dùng DOM renderer — chậm hơn, vẫn chạy.
-    }
+    let webglReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+    const attachWebgl = () => {
+      if (webglRef.current) return;
+      try {
+        const gl = new WebglAddon();
+        gl.onContextLoss(() => {
+          if (webglRef.current === gl) webglRef.current = null;
+          gl.dispose();
+        });
+        term.loadAddon(gl);
+        webglRef.current = gl;
+      } catch {
+        // Không có WebGL thì xterm tự dùng canvas renderer — chậm hơn, vẫn chạy.
+      }
+    };
+    // Workspace khởi động ở trạng thái ẩn dùng renderer mặc định cho tới lần đầu xuất hiện,
+    // tránh tạo rồi huỷ texture ngay trong 700 ms đầu của phiên.
+    if (panelVisibleRef.current) attachWebgl();
     fit.fit();
     termRef.current = term;
     // Móc để bài kiểm tự động đọc được trạng thái thật của xterm (`hasSelection`, buffer…).
@@ -139,12 +167,51 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
       flush();
     });
 
+    // Phần lớn terminal chỉ in text. Chỉ tải/khởi tạo image addon khi PTY thật sự phát
+    // SIXEL hoặc iTerm image, nhưng vẫn xếp hàng đúng thứ tự chunk trong lúc addon tải.
+    const imageProtocolStates = IMAGE_PROTOCOL_MARKERS.map(() => 0);
+    let imageAddonPromise: Promise<void> | null = null;
+    let outputChain = Promise.resolve();
+    const writeOutput = (data: Uint8Array) => new Promise<void>((resolve) => {
+      if (disposed) {
+        resolve();
+        return;
+      }
+      term.write(data, () => {
+        pendingAcks += 1;
+        flush();
+        resolve();
+      });
+    });
+
     const channel = new Channel<ArrayBuffer>();
     channel.onmessage = (buf) => {
-      term.write(new Uint8Array(buf), () => {
-        pendingAcks++;
-        flush();
-      });
+      const data = new Uint8Array(buf);
+      if (!imageAddonPromise && containsImageProtocol(data, imageProtocolStates)) {
+        imageAddonPromise = import("@xterm/addon-image")
+          .then(({ ImageAddon }) => {
+            if (disposed) return;
+            term.loadAddon(new ImageAddon({
+              pixelLimit: 4_194_304,
+              storageLimit: 32,
+              sixelSizeLimit: 8_000_000,
+              iipSizeLimit: 8_000_000,
+            }));
+          })
+          .catch(() => {
+            // Text output remains available when inline-image support cannot be loaded.
+          });
+      }
+
+      if (imageAddonPromise) {
+        // Từ chunk ảnh đầu tiên trở đi giữ một hàng đợi nhỏ để không chunk text nào
+        // vượt qua chunk đang chờ addon tải xong.
+        outputChain = outputChain
+          .then(() => imageAddonPromise)
+          .then(() => writeOutput(data));
+      } else {
+        void writeOutput(data);
+      }
     };
 
     const cols = term.cols > 0 ? term.cols : 80;
@@ -199,6 +266,28 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
       // dragging a divider). Fit once at the next compositor frame, then keep the existing
       // debounced PTY resize so the shell itself is not redrawn for every pixel moved.
       if (resizeFrame === null) resizeFrame = requestAnimationFrame(fitAtNextFrame);
+    };
+
+    visibilityHandlerRef.current = (visible) => {
+      if (webglReleaseTimer) {
+        clearTimeout(webglReleaseTimer);
+        webglReleaseTimer = null;
+      }
+      if (visible) {
+        attachWebgl();
+        handleResize();
+        term.refresh(0, Math.max(0, term.rows - 1));
+        return;
+      }
+
+      // Đợi animation chuyển workspace hoàn tất rồi mới trả GPU texture. PTY vẫn chạy,
+      // nên khi quay lại chỉ cần gắn renderer mới chứ không khởi động lại terminal.
+      webglReleaseTimer = setTimeout(() => {
+        const gl = webglRef.current;
+        if (!gl) return;
+        webglRef.current = null;
+        gl.dispose();
+      }, HIDDEN_WEBGL_RELEASE_MS);
     };
 
     const ro = new ResizeObserver(() => {
@@ -292,6 +381,8 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
 
     return () => {
       disposed = true;
+      if (webglReleaseTimer) clearTimeout(webglReleaseTimer);
+      visibilityHandlerRef.current = () => undefined;
       clearInterval(poll);
       ro.disconnect();
       window.removeEventListener("resize", handleResize);
@@ -302,11 +393,14 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
       oscCwd.dispose();
       if (id !== null) invoke("pty_kill", { sessionId: id }).catch(() => {});
       term.dispose();
+      if (termRef.current === term) termRef.current = null;
+      webglRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     panelVisibleRef.current = opts.panelVisible !== false;
+    visibilityHandlerRef.current(panelVisibleRef.current);
     if (panelVisibleRef.current) flushRef.current();
   }, [opts.panelVisible]);
 

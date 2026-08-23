@@ -220,6 +220,7 @@ pub fn run() {
             system::system_metrics,
             audio::audio_levels,
             audio::audio_set_active,
+            audio::media_set_active,
             audio::now_playing,
             wallpaper::wallpaper_path,
             wallpaper::wallpaper_pick,

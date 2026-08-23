@@ -115,6 +115,7 @@ export function SystemPanel({ panelKey, visible = true }: { panelKey: string; vi
   useEffect(() => {
     if (!visible) return;
     let alive = true;
+    invoke("media_set_active", { active: true }).catch(() => {});
     const tick = () => {
       invoke<NowPlaying | null>("now_playing")
         .then((next) => alive && setNowPlaying(next))
@@ -125,6 +126,7 @@ export function SystemPanel({ panelKey, visible = true }: { panelKey: string; vi
     return () => {
       alive = false;
       window.clearInterval(timer);
+      invoke("media_set_active", { active: false }).catch(() => {});
     };
   }, [visible]);
 
