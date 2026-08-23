@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Tethys Logo" width="130" />
+  <img src="assets/logo.png" alt="Tethys Logo" width="124" />
 
   # Tethys
 
-  **A fluid, hardware-accelerated tiling workspace designed for AI coding agents & modern developer workflows.**
+  **Stop Alt-Tabbing. A high-performance tiling workspace designed for AI coding agents.**
 
   [![Release](https://img.shields.io/github/v/release/QuangquyNguyenvo/Tethys?style=flat-square&color=818cf8)](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)
   [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-38bdf8?style=flat-square)](https://github.com/QuangquyNguyenvo/Tethys)
@@ -12,14 +12,24 @@
   [![License](https://img.shields.io/badge/License-MIT-a855f7?style=flat-square)](LICENSE)
 
   <br />
-  <img src="assets/divider.svg" width="70%" alt="divider" />
+  <img src="assets/divider.svg" width="65%" alt="divider" />
 </div>
 
-## Overview
+## 💥 The Problem: The Alt-Tab Tax
 
-AI coding agents (`claude`, `aider`, `codex`) work fast, but jumping between terminals, file viewers, image inspectors, and browsers destroys focus.
+Running CLI coding agents (`claude`, `aider`, `codex`) all day has created a new developer bottleneck: **context switching**.
 
-**Tethys** eliminates the Alt-Tab cycle by bringing your terminal, live previews, and development tools into a **single, responsive tiling canvas**. Built as a lightweight, single-process Tauri v2 application, it delivers near-instant ConPTY throughput without background daemon bloat.
+```
+The Daily Alt-Tab Chaos:
+[ Terminal ] ──(Alt-Tab)──> [ VS Code Diff ] ──(Alt-Tab)──> [ Image Viewer ] ──(Alt-Tab)──> [ Browser ]
+```
+
+When an agent refactors code, generates a markdown spec, or outputs an architectural chart, you have to constantly flip between separate windows just to verify the work. 
+
+- **Traditional Terminals** (*Windows Terminal, Alacritty*): Fast, but blind to artifacts. No live previews, no diffs, no web view.
+- **Heavy Electron Workspaces** (*WaveTerm*): Sluggish 500MB+ RAM hogs with background daemons and flaky Windows ConPTY support.
+
+**Tethys fixes this.** It embeds your terminal, real-time file watcher, diff inspector, and web preview into **one lightweight, GPU-accelerated tiling workspace**.
 
 <div align="center">
   <img src="assets/screenshots/preview.png" alt="Tethys Workspace Preview" width="100%" />
@@ -27,44 +37,44 @@ AI coding agents (`claude`, `aider`, `codex`) work fast, but jumping between ter
 
 ---
 
-## Highlights
+## ⚡ Core Capabilities
 
 <table>
   <tr>
     <td width="50%">
-      <h4>⚡ Native ConPTY Engine</h4>
-      <p>Direct <code>portable-pty</code> integration with an adaptive 8–16ms binary flush channel for zero-lag shell responsiveness.</p>
-    </td>
-    <td width="50%">
-      <h4>🪟 Fluid Tiling Architecture</h4>
-      <p>Split horizontally/vertically, resize gutters, or drag-and-drop panels freely without overlapping window clutter.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
       <h4>👁️ Live Agent Watcher</h4>
-      <p>Instant side-by-side rendering for generated Markdown, charts, images (PNG/SVG), and Git diffs as agents modify files.</p>
+      <p>The instant your AI agent writes a file, Tethys renders the Markdown spec, visual chart (PNG/SVG), or Git diff side-by-side. Zero manual refreshing.</p>
     </td>
     <td width="50%">
-      <h4>🎨 Material You & Mica Blur</h4>
-      <p>Dynamic color harmony extracted directly from your wallpaper, paired with native Windows 11 Acrylic & Mica transparency.</p>
+      <h4>🚀 Sub-16ms ConPTY Engine</h4>
+      <p>Direct <code>portable-pty</code> integration with an optimized binary channel flush. Pure native Windows ConPTY with near-zero latency.</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h4>🏎️ WebGL-Accelerated Terminal</h4>
-      <p>GPU-accelerated <code>xterm.js</code> engine rendering crisp typography at full 60+ FPS.</p>
+      <h4>🪟 Frictionless Tiling</h4>
+      <p>Split horizontally or vertically, drag to reorder, and resize panels dynamically. Terminal is a tile, not an isolated world.</p>
+    </td>
+    <td width="50%">
+      <h4>🎨 Material You & Mica Glass</h4>
+      <p>Extracts dynamic accent palettes from your active wallpaper, paired with native Windows 11 Acrylic & Mica transparency.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h4>🏎️ WebGL-Accelerated Typography</h4>
+      <p>Rendered with <code>xterm.js</code> + <code>@xterm/addon-webgl</code> for crisp text and rock-solid 60+ FPS terminal throughput.</p>
     </td>
     <td width="50%">
       <h4>🔍 OSC 133 Shell Blocks</h4>
-      <p>Semantic command execution blocks with exit-status indicators and one-click output capture for PowerShell 7.</p>
+      <p>Semantic command isolation with exit status badges and one-click output capture (PowerShell 7 optimized).</p>
     </td>
   </tr>
 </table>
 
 ---
 
-## Gallery
+## 📸 Interface
 
 <div align="center">
   <img src="assets/screenshots/glass.png" alt="Mica Glass UI" width="49%" />
@@ -73,34 +83,30 @@ AI coding agents (`claude`, `aider`, `codex`) work fast, but jumping between ter
 
 ---
 
-## Installation
+## 📥 Download & Setup
 
-### Pre-built Binaries (Windows)
+Download the latest build from **[GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)**:
 
-Download the latest release from **[GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)**:
+- **Installer (`.msi`)**: `Tethys_x64.msi` — Standard Windows installation.
+- **Portable (`.zip`)**: `Tethys_portable.zip` — Extract and run `Tethys.exe` directly.
 
-| Distribution | Package | Description |
-| :--- | :--- | :--- |
-| **Installer** | `Tethys_x64.msi` | Standard Windows installer with start menu & file associations |
-| **Portable** | `Tethys_portable.zip` | Standalone archive — extract and launch `Tethys.exe` |
-
-> **Recommended Shell**: For full OSC 133 command block support, install [PowerShell 7](https://github.com/PowerShell/PowerShell):
+> **💡 Shell Tip**: For optimal OSC 133 command block detection, run **PowerShell 7**:
 > ```powershell
 > winget install Microsoft.PowerShell
 > ```
 
 ---
 
-## Key Shortcuts
+## ⌨️ Essential Shortcuts
 
-| Keybinding | Action |
+| Shortcut | Action |
 | :--- | :--- |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> / <kbd>Ctrl</kbd> + <kbd>P</kbd> | Open Command Palette |
-| <kbd>Ctrl</kbd> + <kbd>\</kbd> | Split panel horizontally |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | Split panel vertically |
-| <kbd>Ctrl</kbd> + <kbd>W</kbd> | Close active panel |
-| <kbd>Alt</kbd> + <kbd>Arrow Keys</kbd> / <kbd>Ctrl</kbd> + <kbd>Tab</kbd> | Navigate between panels |
-| <kbd>F11</kbd> | Toggle Fullscreen |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> | Open Omni Command Palette |
+| <kbd>Ctrl</kbd> + <kbd>\</kbd> | Split Active Panel Horizontally |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | Split Active Panel Vertically |
+| <kbd>Ctrl</kbd> + <kbd>W</kbd> | Close Active Panel |
+| <kbd>Alt</kbd> + <kbd>Arrow Keys</kbd> / <kbd>Ctrl</kbd> + <kbd>Tab</kbd> | Navigate Between Tiled Panels |
+| <kbd>F11</kbd> | Toggle Fullscreen Mode |
 
 ---
 
@@ -109,15 +115,15 @@ Download the latest release from **[GitHub Releases](https://github.com/Quangquy
 
 <br />
 
-**Prerequisites**: Node.js 18+, Rust 1.75+ (`rustup`), and Visual Studio C++ Build Tools.
+**Prerequisites**: Node.js 18+, Rust 1.75+ (`rustup`), Visual Studio C++ Build Tools.
 
 ```bash
-# Clone & install
+# Clone & install dependencies
 git clone https://github.com/QuangquyNguyenvo/Tethys.git
 cd Tethys/app
 npm install
 
-# Run dev mode
+# Start development mode
 npm run tauri dev
 
 # Build release bundle
