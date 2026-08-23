@@ -26,13 +26,24 @@ export default function App() {
   const restore = useSessions((s) => s.restore);
   const createPanel = useSessions((s) => s.createPanel);
   const duplicate = useSessions((s) => s.duplicate);
+  const hydrated = useSessions((s) => s.hydrated);
   const setHydrated = useSessions((s) => s.setHydrated);
   const workspaces = useSessions((s) => s.workspaces);
   const activeWorkspaceId = useSessions((s) => s.activeWorkspaceId);
   const switchWorkspace = useSessions((s) => s.switchWorkspace);
+  const cycleWorkspace = useSessions((s) => s.cycleWorkspace);
   const addWorkspace = useSessions((s) => s.addWorkspace);
   const removeWorkspace = useSessions((s) => s.removeWorkspace);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(() => {
+    invoke<boolean>("app_window_toggle_fullscreen")
+      .then(setIsFullscreen)
+      .catch((error) => {
+        invoke("frontend_error", { message: `fullscreen toggle failed: ${String(error)}` }).catch(() => {});
+      });
+  }, []);
   // CSS controls the webview only; the actual Acrylic/Mica surface belongs to Windows.
   useEffect(() => {
     invoke("app_window_set_vibrancy", { enabled: opts.windowVibrancy !== false }).catch(() => {});
@@ -93,17 +104,26 @@ export default function App() {
               // giao diện kính; từ đây trở đi người dùng đổi lại Phẳng vẫn được giữ nguyên.
               const savedTheme = saved.theme_opts as Record<string, unknown>;
               const legacyAppearance = savedTheme.appearanceVersion === undefined;
+              // V5 returns the workspace bar to its original auto-hide behavior. The dock
+              // stays available, since its edge trigger is too easy to miss in daily use.
+              const preWorkspaceAutoHide =
+                legacyAppearance ||
+                (typeof savedTheme.appearanceVersion === "number" && savedTheme.appearanceVersion < 5);
               setOpts(
                 legacyAppearance
                   ? {
                       ...savedTheme,
-                      appearanceVersion: 2,
+                      appearanceVersion: 5,
                       colorSource: "wallpaper",
                       surfaceStyle: "glass",
                       windowVibrancy: true,
                       blurEffects: true,
+                      dockAutoHide: false,
+                      navAutoHide: true,
                     }
-                  : savedTheme,
+                  : preWorkspaceAutoHide
+                    ? { ...savedTheme, appearanceVersion: 5, dockAutoHide: false, navAutoHide: true }
+                    : savedTheme,
               );
             }
           }
@@ -115,6 +135,8 @@ export default function App() {
 
   // Tự động lưu trạng thái khi layout, workspaces hoặc cài đặt thay đổi (debounce 500ms)
   useEffect(() => {
+    // Không để state mặc định ghi đè state trên đĩa trong lúc IPC khởi động còn đang nạp.
+    if (!hydrated) return;
     const timer = setTimeout(() => {
       invoke("storage_save_state", {
         state: {
@@ -129,7 +151,7 @@ export default function App() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [tree, panels, focused, opts, workspaces, activeWorkspaceId]);
+  }, [hydrated, tree, panels, focused, opts, workspaces, activeWorkspaceId]);
 
   // Kéo thả file từ bên ngoài vào cửa sổ -> mở Preview
   useEffect(() => {
@@ -196,6 +218,15 @@ export default function App() {
   // Phím tắt toàn cục: Command Palette và Layout navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A real native fullscreen, so Windows chrome is gone as well. Capture phase keeps
+      // both shortcuts available while focus is inside the xterm canvas.
+      if (e.key === "F11" || (e.altKey && !e.ctrlKey && !e.shiftKey && e.code === "Enter")) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFullscreen();
+        return;
+      }
+
       if (
         (e.ctrlKey && e.key.toLowerCase() === "k") ||
         (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "p") ||
@@ -204,6 +235,22 @@ export default function App() {
         e.preventDefault();
         setPaletteOpen((prev) => !prev);
         return;
+      }
+
+      // Ctrl+1 / Ctrl+3 step through workspaces with wraparound. Keep this ahead of
+      // xterm so the shell never receives the digit after the workspace has changed.
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        const step = /^(?:Digit|Numpad)1$/.test(e.code)
+          ? -1
+          : /^(?:Digit|Numpad)3$/.test(e.code)
+            ? 1
+            : null;
+        if (step) {
+          e.preventDefault();
+          e.stopPropagation();
+          cycleWorkspace(step);
+          return;
+        }
       }
 
       // Alt+1…9 — nhảy thẳng tới workspace thứ n.
@@ -323,13 +370,13 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [remove, move, snapPanel, stepTermOpacity, duplicate, openSettings, createPanel]);
+  }, [remove, move, snapPanel, stepTermOpacity, duplicate, openSettings, createPanel, cycleWorkspace, toggleFullscreen]);
 
   const commands: CommandItem[] = useMemo(
     () => [
       {
         id: "split_right",
-        title: "Đặt block đang chọn sang phải",
+        title: "Place selected panel to the right",
         category: "Layout",
         shortcut: "Ctrl+Shift+E",
         action: () => {
@@ -339,7 +386,7 @@ export default function App() {
       },
       {
         id: "split_down",
-        title: "Đặt block đang chọn xuống dưới",
+        title: "Place selected panel below",
         category: "Layout",
         shortcut: "Ctrl+Shift+O",
         action: () => {
@@ -349,7 +396,7 @@ export default function App() {
       },
       {
         id: "close_panel",
-        title: "Đóng panel đang chọn",
+        title: "Close selected panel",
         category: "Layout",
         shortcut: "Ctrl+Shift+W",
         action: () => {
@@ -359,7 +406,7 @@ export default function App() {
       },
       {
         id: "next_panel",
-        title: "Chuyển tới panel kế tiếp",
+        title: "Go to next panel",
         category: "Layout",
         shortcut: "Ctrl+Shift+Tab",
         action: () => {
@@ -368,7 +415,7 @@ export default function App() {
       },
       {
         id: "open_explorer",
-        title: "Mở trình duyệt tệp",
+        title: "Open file explorer",
         category: "Widget",
         action: () => {
           createPanel({ type: "explorer" });
@@ -376,7 +423,7 @@ export default function App() {
       },
       {
         id: "open_web",
-        title: "Mở trình duyệt web",
+        title: "Open web browser",
         category: "Widget",
         action: () => {
           createPanel({ type: "web" });
@@ -384,13 +431,13 @@ export default function App() {
       },
       {
         id: "open_system",
-        title: "Mở thông tin hệ thống",
+        title: "Open system information",
         category: "Widget",
         action: openSystem,
       },
       {
         id: "open_terminal",
-        title: "Mở terminal mới",
+        title: "Open new terminal",
         category: "Widget",
         action: () => {
           createPanel({ type: "terminal" });
@@ -398,7 +445,7 @@ export default function App() {
       },
       {
         id: "duplicate_panel",
-        title: "Nhân đôi panel, giữ nguyên thư mục làm việc",
+        title: "Duplicate panel with the same working directory",
         category: "Layout",
         shortcut: "Ctrl+Shift+D",
         action: () => {
@@ -407,7 +454,7 @@ export default function App() {
       },
       {
         id: "open_settings",
-        title: "Mở cài đặt",
+        title: "Open settings",
         category: "Settings",
         shortcut: "Ctrl+,",
         action: () => {
@@ -416,7 +463,7 @@ export default function App() {
       },
       {
         id: "layout_spiral",
-        title: "Chia block kiểu xoắn ốc (mặc định)",
+        title: "Use spiral split layout (default)",
         category: "Layout",
         action: () => {
           setOpts({ layoutMode: "spiral" });
@@ -424,7 +471,7 @@ export default function App() {
       },
       {
         id: "layout_dwindle",
-        title: "Chia block theo cạnh dài",
+        title: "Split panels along their longest side",
         category: "Layout",
         action: () => {
           setOpts({ layoutMode: "dwindle" });
@@ -432,7 +479,7 @@ export default function App() {
       },
       {
         id: "layout_manual",
-        title: "Chia block luôn sang phải",
+        title: "Always split panels to the right",
         category: "Layout",
         action: () => {
           setOpts({ layoutMode: "manual" });
@@ -440,7 +487,7 @@ export default function App() {
       },
       {
         id: "toggle_tabkeys",
-        title: "Phím Ctrl+T / Ctrl+W: app giành hay trả cho shell",
+        title: "Toggle whether Ctrl+T / Ctrl+W are handled by the app or shell",
         category: "Settings",
         action: () => {
           setOpts({ tabShortcuts: !useThemeStore.getState().opts.tabShortcuts });
@@ -448,7 +495,7 @@ export default function App() {
       },
       {
         id: "toggle_wskeys",
-        title: "Phím Alt+1…9 chuyển workspace: app giành hay trả cho shell",
+        title: "Toggle whether Alt+1…9 switches workspaces or is handled by the shell",
         category: "Settings",
         action: () => {
           setOpts({ workspaceAltKeys: !useThemeStore.getState().opts.workspaceAltKeys });
@@ -456,7 +503,7 @@ export default function App() {
       },
       {
         id: "toggle_dock",
-        title: "Dock tự ẩn: bật / tắt",
+        title: "Toggle dock auto-hide",
         category: "Settings",
         action: () => {
           setOpts({ dockAutoHide: !useThemeStore.getState().opts.dockAutoHide });
@@ -464,7 +511,7 @@ export default function App() {
       },
       {
         id: "theme_refresh",
-        title: "Trích xuất lại màu từ ảnh nền Desktop",
+        title: "Extract colors from the desktop wallpaper again",
         category: "Theme",
         action: () => {
           refresh();
@@ -472,7 +519,7 @@ export default function App() {
       },
       {
         id: "term_more_transparent",
-        title: "Nền terminal trong hơn",
+        title: "Make terminal background more transparent",
         category: "Theme",
         shortcut: "Ctrl+Shift+[",
         action: () => {
@@ -481,7 +528,7 @@ export default function App() {
       },
       {
         id: "term_less_transparent",
-        title: "Nền terminal đục hơn",
+        title: "Make terminal background more opaque",
         category: "Theme",
         shortcut: "Ctrl+Shift+]",
         action: () => {
@@ -490,7 +537,7 @@ export default function App() {
       },
       {
         id: "term_opacity_solid",
-        title: "Nền terminal: đặc hoàn toàn (tắt trong suốt)",
+        title: "Set terminal background to fully opaque",
         category: "Theme",
         action: () => {
           setOpts({ termOpacity: 1 });
@@ -498,7 +545,7 @@ export default function App() {
       },
       {
         id: "term_opacity_glass",
-        title: "Nền terminal: kính rất mờ (40%)",
+        title: "Set terminal background to light glass (40%)",
         category: "Theme",
         action: () => {
           setOpts({ termOpacity: 0.4 });
@@ -506,7 +553,7 @@ export default function App() {
       },
       {
         id: "term_opacity_default",
-        title: "Nền terminal: mặc định (60%)",
+        title: "Set terminal background to default opacity (60%)",
         category: "Theme",
         action: () => {
           setOpts({ termOpacity: 0.6 });
@@ -514,7 +561,7 @@ export default function App() {
       },
       {
         id: "theme_tonal",
-        title: "Chuyển scheme màu M3: TonalSpot (Khuyên dùng)",
+        title: "Use Material 3 TonalSpot color scheme (recommended)",
         category: "Theme",
         action: () => {
           setOpts({ scheme: "TonalSpot" });
@@ -522,7 +569,7 @@ export default function App() {
       },
       {
         id: "theme_vibrant",
-        title: "Chuyển scheme màu M3: Vibrant",
+        title: "Use Material 3 Vibrant color scheme",
         category: "Theme",
         action: () => {
           setOpts({ scheme: "Vibrant" });
@@ -530,7 +577,7 @@ export default function App() {
       },
       {
         id: "theme_expressive",
-        title: "Chuyển scheme màu M3: Expressive",
+        title: "Use Material 3 Expressive color scheme",
         category: "Theme",
         action: () => {
           setOpts({ scheme: "Expressive" });
@@ -538,7 +585,7 @@ export default function App() {
       },
       {
         id: "theme_neutral",
-        title: "Chuyển scheme màu M3: Neutral",
+        title: "Use Material 3 Neutral color scheme",
         category: "Theme",
         action: () => {
           setOpts({ scheme: "Neutral" });
@@ -573,7 +620,7 @@ export default function App() {
       },
       {
         id: "files",
-        label: "Tệp",
+        label: "Files",
         accent: 3,
         onClick: () => createPanel({ type: "explorer" }),
         icon: <Folder size={19} />,
@@ -587,14 +634,14 @@ export default function App() {
       },
       {
         id: "settings",
-        label: "Cài đặt (Ctrl+,)",
+        label: "Settings (Ctrl+,)",
         accent: 6,
         onClick: openSettings,
         icon: <Settings size={19} />,
       },
       {
         id: "system",
-        label: "Hệ thống",
+        label: "System",
         accent: 2,
         onClick: openSystem,
         icon: <MonitorCog size={19} />,
@@ -631,6 +678,7 @@ export default function App() {
     <div
       className={
         "app" +
+        (isFullscreen ? " is-fullscreen" : "") +
         (opts.dockAutoHide ? " dock-auto" : "") +
         (opts.navAutoHide ? " nav-auto" : "") +
         (opts.blurEffects === false ? " effects-off" : "") +
@@ -673,7 +721,7 @@ export default function App() {
 
       {/* Nói thẳng khi màu đang chạy dự phòng, thay vì để người dùng đoán vì sao xấu. */}
       {source === "fallback" && opts.colorSource === "wallpaper" && (
-        <div className="notice">Không đọc được ảnh nền — đang dùng bảng màu dự phòng</div>
+        <div className="notice">Couldn't read the wallpaper — using fallback colors</div>
       )}
     </div>
   );

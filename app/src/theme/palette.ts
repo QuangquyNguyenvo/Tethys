@@ -113,11 +113,13 @@ export type ThemeOptions = {
   workspaceAltKeys: boolean;
   /** Ảnh nền riêng của app; rỗng nghĩa là dùng wallpaper Desktop hiện tại. */
   wallpaperPath: string;
+  /** Ảnh thay thế logo chữ trong panel sysfetch; rỗng nghĩa là dùng logo TETHYS mặc định. */
+  sysfetchLogoPath: string;
 };
 
 /** Mặc định lấy từ `ui-demo/index.html`, nơi các con số này được kéo thử bằng tay. */
 export const DEFAULTS: ThemeOptions = {
-  appearanceVersion: 2,
+  appearanceVersion: 5,
   // Workspace nên mở đúng bản chất của nó: lấy wallpaper Windows, nền kính và terminal
   // trong mờ. Chế độ thương hiệu/phẳng vẫn là lựa chọn trong Cài đặt, không phải trạng
   // thái khởi động làm người dùng tưởng hiệu ứng đã bị gỡ.
@@ -145,6 +147,7 @@ export const DEFAULTS: ThemeOptions = {
   tabShortcuts: true,
   workspaceAltKeys: true,
   wallpaperPath: "",
+  sysfetchLogoPath: "",
 };
 
 /** Biên độ cho phép của `termOpacity`. Dưới 0,3 thì chữ nằm trên ảnh nền, không đọc nổi. */

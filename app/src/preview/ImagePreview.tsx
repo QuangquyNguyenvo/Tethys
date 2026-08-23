@@ -20,7 +20,7 @@ export function ImagePreview({ path, onDimensions }: Props) {
   }, [path]);
 
   if (error) {
-    return <div className="pv-err">Không thể tải ảnh: {error}</div>;
+    return <div className="pv-err">Could not load image: {error}</div>;
   }
 
   return (
@@ -33,7 +33,7 @@ export function ImagePreview({ path, onDimensions }: Props) {
           const img = e.currentTarget;
           onDimensions?.({ width: img.naturalWidth, height: img.naturalHeight });
         }}
-        onError={() => setError("Lỗi giải mã ảnh")}
+        onError={() => setError("Image decoding error")}
       />
     </div>
   );

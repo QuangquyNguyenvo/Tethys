@@ -71,7 +71,7 @@ async function seedFromWallpaper(customPath?: string): Promise<{ seed: number; p
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Khong lay duoc canvas 2d context");
+  if (!ctx) throw new Error("Could not get 2D canvas context");
   ctx.drawImage(img, 0, 0, w, h);
 
   const { data } = ctx.getImageData(0, 0, w, h);
@@ -138,7 +138,7 @@ export function useTheme() {
       })
       .catch((e) => {
         // Thà xấu còn hơn trắng bệch: vẫn có màu, và `source` nói rõ là đang chạy fallback.
-        console.warn("Khong doc duoc anh nen, dung mau du phong:", e);
+        console.warn("Could not read wallpaper; using fallback colors:", e);
         if (!cancelled) setSeed(FALLBACK_SEED, "fallback", "", String(e?.message ?? e));
       });
     return () => {

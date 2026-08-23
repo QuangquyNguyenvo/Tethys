@@ -33,7 +33,7 @@ impl PtyManager {
 
     fn with<T>(&self, id: SessionId, f: impl FnOnce(&mut PtySession) -> Result<T>) -> Result<T> {
         let mut map = self.sessions.lock().unwrap();
-        let s = map.get_mut(&id).ok_or_else(|| anyhow!("session {id} không tồn tại"))?;
+        let s = map.get_mut(&id).ok_or_else(|| anyhow!("session {id} does not exist"))?;
         f(s)
     }
 

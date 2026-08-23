@@ -121,13 +121,13 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
   const splitActions: HeadAction[] = [
     {
       id: "split-row",
-      label: "Chia sang phải (Ctrl+Shift+E)",
+      label: "Split to the right (Ctrl+Shift+E)",
       icon: <SquareSplitHorizontal size={ICON} />,
       onClick: () => split("row", undefined, panelKey),
     },
     {
       id: "split-col",
-      label: "Chia xuống dưới (Ctrl+Shift+O)",
+      label: "Split below (Ctrl+Shift+O)",
       icon: <SquareSplitVertical size={ICON} />,
       onClick: () => split("col", undefined, panelKey),
     },
@@ -136,13 +136,13 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
   const navigationActions: HeadAction[] = [
     {
       id: "previous-panel",
-      label: "Chuyển tới block trước",
+      label: "Go to previous panel",
       icon: <ChevronLeft size={ICON + 1} />,
       onClick: () => move(-1),
     },
     {
       id: "next-panel",
-      label: "Chuyển tới block kế tiếp (Ctrl+Shift+Tab)",
+      label: "Go to next panel (Ctrl+Shift+Tab)",
       icon: <ChevronRight size={ICON + 1} />,
       onClick: () => move(1),
     },
@@ -150,7 +150,7 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
 
   const closeAction: HeadAction = {
     id: "close",
-    label: "Đóng panel (Ctrl+Shift+W)",
+    label: "Close panel (Ctrl+Shift+W)",
     icon: <X size={ICON} />,
     danger: true,
     onClick: () => panelKey && remove(panelKey),
@@ -177,7 +177,7 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
       ref={ref}
       className={"panel-head head-" + kind + (minimal ? " minimal" : "")}
       {...dragProps}
-      title={minimal ? title : "Kéo thanh này để đổi chỗ panel"}
+      title={minimal ? title : "Drag this bar to move the panel"}
       onAuxClick={(e) => {
         if (e.button !== 1 || !panelKey) return;
         e.preventDefault();
@@ -212,8 +212,8 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
         {!minimal && (
           <button
             className="iconbtn move-handle"
-            title="Giữ và kéo để di chuyển block"
-            aria-label="Kéo để di chuyển block"
+            title="Hold and drag to move the panel"
+            aria-label="Drag to move the panel"
             {...handleDragProps}
           >
             <GripVertical size={14} />
@@ -244,8 +244,8 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
             <button
               ref={btnRef}
               className={"iconbtn" + (menuOpen ? " on" : "")}
-              title="Thêm thao tác"
-              aria-label="Thêm thao tác"
+              title="More actions"
+              aria-label="More actions"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((o) => !o)}
             >
@@ -284,8 +284,8 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
         {panelKey && !minimal && (
           <button
             className="iconbtn close"
-            title="Đóng panel (Ctrl+Shift+W)"
-            aria-label="Đóng panel"
+            title="Close panel (Ctrl+Shift+W)"
+            aria-label="Close panel"
             onClick={() => remove(panelKey)}
           >
             <X size={ICON} />

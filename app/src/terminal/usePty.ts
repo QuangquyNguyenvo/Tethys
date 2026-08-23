@@ -4,6 +4,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { ImageAddon } from "@xterm/addon-image";
 import type { ITheme } from "@xterm/xterm";
 import { registerFileLinkProvider } from "./links";
 import { Osc133Tracker, type CommandBlock } from "./osc133";
@@ -42,6 +43,7 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
   const [cwd, setCwd] = useState<string | undefined>(opts.cwd);
   const cwdRef = useRef<string | undefined>(opts.cwd);
   const panelVisibleRef = useRef(opts.panelVisible !== false);
+  const flushRef = useRef<() => void>(() => {});
   const termRef = useRef<Terminal | null>(null);
   const trackerRef = useRef<Osc133Tracker | null>(null);
 
@@ -73,6 +75,14 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
     const uni = new Unicode11Addon();
     term.loadAddon(uni);
     term.unicode.activeVersion = "11";
+    // Ảnh inline từ các công cụ tương thích SIXEL hoặc iTerm Inline Image Protocol.
+    // Giới hạn có chủ đích: mỗi panel giữ tối đa 32 MB ảnh để scrollback không ăn RAM vô hạn.
+    term.loadAddon(new ImageAddon({
+      pixelLimit: 4_194_304,
+      storageLimit: 32,
+      sixelSizeLimit: 8_000_000,
+      iipSizeLimit: 8_000_000,
+    }));
 
     term.open(host.current);
     try {
@@ -106,8 +116,11 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
     let pendingAcks = 0;
 
     const flush = () => {
-      if (id === null || !panelVisibleRef.current) return;
-      if (pendingIn.length > 0) {
+      if (id === null) return;
+      // Output acknowledgements must never pause in a hidden workspace. Otherwise the
+      // backend's back-pressure window fills, throttling the shell until another chunk
+      // happens to arrive after the panel is visible again.
+      if (panelVisibleRef.current && pendingIn.length > 0) {
         const data = pendingIn.splice(0, pendingIn.length);
         invoke("pty_write", { sessionId: id, data }).catch(() => {});
       }
@@ -117,6 +130,7 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
         invoke("pty_ack", { sessionId: id, count }).catch(() => {});
       }
     };
+    flushRef.current = flush;
 
     // Gắn TRƯỚC khi spawn. Xem chú thích trên.
     term.onData((d) => {
@@ -165,7 +179,9 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
     // thì hoãn 90ms. Bản trước gộp cả hai vào một `requestAnimationFrame`, nên kéo gutter
     // hay chạy hoạt ảnh trượt panel là bắn IPC mỗi khung — shell vẽ lại prompt liên tục.
     let resizeTimer: number | null = null;
-    const handleResize = () => {
+    let resizeFrame: number | null = null;
+    const fitAtNextFrame = () => {
+      resizeFrame = null;
       try {
         fit.fit();
       } catch {
@@ -178,6 +194,12 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
         }, 90);
       }
     };
+    const handleResize = () => {
+      // ResizeObserver can batch several geometry changes before a paint (especially while
+      // dragging a divider). Fit once at the next compositor frame, then keep the existing
+      // debounced PTY resize so the shell itself is not redrawn for every pixel moved.
+      if (resizeFrame === null) resizeFrame = requestAnimationFrame(fitAtNextFrame);
+    };
 
     const ro = new ResizeObserver(() => {
       handleResize();
@@ -186,7 +208,7 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
     window.addEventListener("resize", handleResize);
 
     const poll = setInterval(async () => {
-      if (id === null) return;
+      if (id === null || !panelVisibleRef.current) return;
       const alive = await invoke<boolean>("pty_alive", { sessionId: id }).catch(() => true);
       if (!alive) setState("exited");
     }, 1000);
@@ -273,7 +295,9 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
       clearInterval(poll);
       ro.disconnect();
       window.removeEventListener("resize", handleResize);
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       if (resizeTimer) clearTimeout(resizeTimer);
+      flushRef.current = () => {};
       linkDisposable.dispose();
       oscCwd.dispose();
       if (id !== null) invoke("pty_kill", { sessionId: id }).catch(() => {});
@@ -283,6 +307,7 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
 
   useEffect(() => {
     panelVisibleRef.current = opts.panelVisible !== false;
+    if (panelVisibleRef.current) flushRef.current();
   }, [opts.panelVisible]);
 
   // Đổi ảnh nền hoặc đổi scheme thì bảng màu mới phải vào ngay, không đợi mở lại terminal.

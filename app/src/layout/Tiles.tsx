@@ -1,11 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ITheme } from "@xterm/xterm";
 import { TerminalPanel } from "../terminal/TerminalPanel";
-import { PreviewPanel } from "../preview/PreviewPanel";
-import { ExplorerPanel } from "../explorer/ExplorerPanel";
-import { WebPanel } from "../web/WebPanel";
-import { SettingsPanel } from "../settings/SettingsPanel";
-import { SystemPanel } from "../system/SystemPanel";
 import { useSessions, type Panel } from "../store/sessions";
 import {
   computeLayout,
@@ -18,7 +13,22 @@ import {
 import { setSnapshot } from "./snapshot";
 import { Folder, Plus, Terminal } from "lucide-react";
 
+// Terminal is the default view, while the auxiliary panels load on demand. This keeps the
+// initial renderer path smaller without changing the lifetime of already-open panels.
+const PreviewPanel = lazy(() => import("../preview/PreviewPanel").then(({ PreviewPanel }) => ({ default: PreviewPanel })));
+const ExplorerPanel = lazy(() => import("../explorer/ExplorerPanel").then(({ ExplorerPanel }) => ({ default: ExplorerPanel })));
+const WebPanel = lazy(() => import("../web/WebPanel").then(({ WebPanel }) => ({ default: WebPanel })));
+const SettingsPanel = lazy(() => import("../settings/SettingsPanel").then(({ SettingsPanel }) => ({ default: SettingsPanel })));
+const SystemPanel = lazy(() => import("../system/SystemPanel").then(({ SystemPanel }) => ({ default: SystemPanel })));
+
 type Props = { theme?: ITheme };
+
+type WorkspaceTransition = {
+  leavingKeys: Set<string>;
+  layout: Layout;
+  /** +1 means the new workspace is to the right of the old one. */
+  direction: 1 | -1;
+};
 
 const place = (r: Rect): React.CSSProperties => ({
   transform: `translate(${r.x}px, ${r.y}px)`,
@@ -43,6 +53,7 @@ export function Tiles({ theme }: Props) {
   const tree = useSessions((s) => s.tree);
   const panels = useSessions((s) => s.panels);
   const workspaces = useSessions((s) => s.workspaces);
+  const activeWorkspaceId = useSessions((s) => s.activeWorkspaceId);
   const hydrated = useSessions((s) => s.hydrated);
   const drag = useSessions((s) => s.drag);
   const createPanel = useSessions((s) => s.createPanel);
@@ -99,6 +110,33 @@ export function Tiles({ theme }: Props) {
 
   const ready = hydrated && box.w > 0 && box.h > 0;
 
+  // Keep both layouts at their real dimensions and animate only a visual wrapper. Terminals
+  // therefore never refit on every animation frame while switching workspaces.
+  const previousWorkspaceId = useRef(activeWorkspaceId);
+  const [workspaceTransition, setWorkspaceTransition] = useState<WorkspaceTransition | null>(null);
+  useLayoutEffect(() => {
+    const previousId = previousWorkspaceId.current;
+    if (previousId === activeWorkspaceId) return;
+
+    const previousIndex = workspaces.findIndex((w) => w.id === previousId);
+    const nextIndex = workspaces.findIndex((w) => w.id === activeWorkspaceId);
+    const previous = workspaces[previousIndex];
+    previousWorkspaceId.current = activeWorkspaceId;
+
+    if (!previous || box.w <= 0 || box.h <= 0) {
+      setWorkspaceTransition(null);
+      return;
+    }
+
+    setWorkspaceTransition({
+      leavingKeys: new Set(previous.panels.map((panel) => panel.key)),
+      layout: computeLayout(previous.tree, { x: 0, y: 0, w: box.w, h: box.h }),
+      direction: nextIndex > previousIndex ? 1 : -1,
+    });
+    const timer = window.setTimeout(() => setWorkspaceTransition(null), 520);
+    return () => window.clearTimeout(timer);
+  }, [activeWorkspaceId, workspaces, box.w, box.h]);
+
   // Bóng panel vừa đóng.
   //
   // Không giữ panel sống thêm 200ms để nó tự co lại: làm thế thì layout cũng đứng yên
@@ -126,8 +164,19 @@ export function Tiles({ theme }: Props) {
     <div ref={hostRef} className={"tiles" + (drag ? " is-dragging" : "")}>
       {ready &&
         allPanels.map((p) => {
-          const visible = layout.rects.has(p.key);
-          const rect = layout.rects.get(p.key) ?? lastRects.current.get(p.key) ?? box;
+          const leaving = workspaceTransition?.leavingKeys.has(p.key) ?? false;
+          const visible = layout.rects.has(p.key) || leaving;
+          const rect = leaving
+            ? workspaceTransition?.layout.rects.get(p.key) ?? lastRects.current.get(p.key) ?? box
+            : layout.rects.get(p.key) ?? lastRects.current.get(p.key) ?? box;
+          const workspaceMotion = leaving
+            ? "leaving-" + (workspaceTransition?.direction === 1 ? "left" : "right")
+            : workspaceTransition && layout.rects.has(p.key)
+              ? "entering-" + (workspaceTransition.direction === 1 ? "right" : "left")
+              : undefined;
+          const workspaceOrder = leaving
+            ? Array.from(workspaceTransition?.layout.rects.keys() ?? []).indexOf(p.key)
+            : Array.from(layout.rects.keys()).indexOf(p.key);
           return (
             <PanelHost
               key={p.key}
@@ -135,6 +184,8 @@ export function Tiles({ theme }: Props) {
               rect={rect}
               visible={visible}
               theme={theme}
+              workspaceMotion={workspaceMotion}
+              workspaceOrder={Math.max(0, workspaceOrder)}
             />
           );
         })}
@@ -166,11 +217,15 @@ function PanelHost({
   rect,
   visible,
   theme,
+  workspaceMotion,
+  workspaceOrder,
 }: {
   panel: Panel;
   rect: Rect;
   visible: boolean;
   theme?: ITheme;
+  workspaceMotion?: string;
+  workspaceOrder: number;
 }) {
   const previousRect = useRef<Rect | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -186,7 +241,7 @@ function PanelHost({
   useLayoutEffect(() => {
     const previous = previousRect.current;
     previousRect.current = rect;
-    if (!previous || !visible || (previous.x === rect.x && previous.y === rect.y)) return;
+    if (workspaceMotion || !previous || !visible || (previous.x === rect.x && previous.y === rect.y)) return;
 
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     setMotionArmed(false);
@@ -199,7 +254,7 @@ function PanelHost({
     return () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     };
-  }, [rect.x, rect.y, rect.w, rect.h, visible]);
+  }, [rect.x, rect.y, rect.w, rect.h, visible, workspaceMotion]);
 
   return (
     <div
@@ -207,7 +262,8 @@ function PanelHost({
         "panel-host" +
         (focused ? " on" : "") +
         (visible ? "" : " hidden") +
-        (isSource ? " drag-source" : "")
+        (isSource ? " drag-source" : "") +
+        (workspaceMotion?.startsWith("leaving") ? " workspace-leaving" : "")
       }
       style={place(rect)}
       data-panel-key={panel.key}
@@ -216,28 +272,35 @@ function PanelHost({
       onFocusCapture={() => focus(panel.key)}
     >
       <div
+        className={"workspace-motion" + (workspaceMotion ? " " + workspaceMotion : "")}
+        style={{ "--workspace-order": workspaceOrder } as React.CSSProperties}
+      >
+      <div
         className={"panel-motion" + (motionArmed ? " is-moving" : "")}
         style={motionOffset ? { transform: `translate3d(${motionOffset.x}px, ${motionOffset.y}px, 0)` } : undefined}
       >
-        {panel.type === "preview" && panel.path ? (
-          <PreviewPanel panelKey={panel.key} path={panel.path} mode={panel.mode} />
-        ) : panel.type === "explorer" ? (
-          <ExplorerPanel panelKey={panel.key} path={panel.path} />
-        ) : panel.type === "web" ? (
-          <WebPanel panelKey={panel.key} url={panel.url} />
-        ) : panel.type === "settings" ? (
-          <SettingsPanel panelKey={panel.key} />
-        ) : panel.type === "system" ? (
-          <SystemPanel panelKey={panel.key} />
-        ) : (
-          <TerminalPanel
-            panelKey={panel.key}
-            shell={panel.shell}
-            cwd={panel.cwd}
-            theme={theme}
-            visible={visible}
-          />
-        )}
+        <Suspense fallback={<div className="panel-loading" aria-label="Loading panel" />}>
+          {panel.type === "preview" && panel.path ? (
+            <PreviewPanel panelKey={panel.key} path={panel.path} mode={panel.mode} />
+          ) : panel.type === "explorer" ? (
+            <ExplorerPanel panelKey={panel.key} path={panel.path} />
+          ) : panel.type === "web" ? (
+            <WebPanel panelKey={panel.key} url={panel.url} />
+          ) : panel.type === "settings" ? (
+            <SettingsPanel panelKey={panel.key} />
+          ) : panel.type === "system" ? (
+            <SystemPanel panelKey={panel.key} visible={visible} />
+          ) : (
+            <TerminalPanel
+              panelKey={panel.key}
+              shell={panel.shell}
+              cwd={panel.cwd}
+              theme={theme}
+              visible={visible}
+            />
+          )}
+        </Suspense>
+      </div>
       </div>
     </div>
   );
@@ -256,6 +319,20 @@ function Gutter({ info }: { info: GutterInfo }) {
       const host = el.parentElement?.getBoundingClientRect();
       if (!host) return;
 
+      let pendingRatio: number | null = null;
+      let frame: number | null = null;
+      const commitRatio = () => {
+        frame = null;
+        if (pendingRatio === null) return;
+        const ratio = pendingRatio;
+        pendingRatio = null;
+        resize(info.path, ratio);
+      };
+      const scheduleRatio = (ratio: number) => {
+        pendingRatio = ratio;
+        if (frame === null) frame = requestAnimationFrame(commitRatio);
+      };
+
       el.setPointerCapture(pointerId);
       setActive(true);
       document.body.classList.add("resizing-layout");
@@ -265,7 +342,9 @@ function Gutter({ info }: { info: GutterInfo }) {
           info.dir === "row"
             ? (ev.clientX - host.left - info.parent.x) / info.parent.w
             : (ev.clientY - host.top - info.parent.y) / info.parent.h;
-        resize(info.path, r);
+        // Pointer events can arrive several times before the next paint. One layout update
+        // per display frame is visually identical and avoids duplicate terminal reflows.
+        scheduleRatio(r);
       };
       const onUp = () => {
         el.removeEventListener("pointermove", onMove);
@@ -276,6 +355,12 @@ function Gutter({ info }: { info: GutterInfo }) {
         } catch {
           /* đã nhả rồi */
         }
+        if (frame !== null) {
+          cancelAnimationFrame(frame);
+          frame = null;
+        }
+        // Preserve the exact final position, even when it arrives just after a frame.
+        if (pendingRatio !== null) resize(info.path, pendingRatio);
         setActive(false);
         document.body.classList.remove("resizing-layout");
       };
@@ -294,7 +379,7 @@ function Gutter({ info }: { info: GutterInfo }) {
       onDoubleClick={() => resize(info.path, 0.5)}
       role="separator"
       aria-orientation={info.dir === "row" ? "vertical" : "horizontal"}
-      title="Kéo để chỉnh kích thước · Nhấn đúp để chia đều 50/50"
+      title="Drag to resize · Double-click for an even 50/50 split"
     >
       <span className="gutter-grip" />
     </div>
@@ -302,18 +387,18 @@ function Gutter({ info }: { info: GutterInfo }) {
 }
 
 const ZONE_LABEL: Record<string, string> = {
-  left: "Chia sang trái",
-  right: "Chia sang phải",
-  top: "Chia lên trên",
-  bottom: "Chia xuống dưới",
-  center: "Hoán đổi vị trí",
+  left: "Split to the left",
+  right: "Split to the right",
+  top: "Split above",
+  bottom: "Split below",
+  center: "Swap positions",
 };
 
 const ROOT_LABEL: Record<string, string> = {
-  left: "Đưa ra mép trái",
-  right: "Đưa ra mép phải",
-  top: "Đưa lên trên cùng",
-  bottom: "Đưa xuống dưới cùng",
+  left: "Move to the left edge",
+  right: "Move to the right edge",
+  top: "Move to the top edge",
+  bottom: "Move to the bottom edge",
 };
 
 function DropOverlay({ box, layout }: { box: Rect; layout: Layout }) {
@@ -346,7 +431,7 @@ function DropOverlay({ box, layout }: { box: Rect; layout: Layout }) {
       )}
       <div className="drag-ghost" style={{ transform: `translate(${drag.x}px, ${drag.y}px)` }}>
         <span className="drag-ghost-dot" />
-        <span>đang di chuyển panel</span>
+        <span>moving panel</span>
       </div>
     </>
   );
@@ -359,20 +444,20 @@ function EmptyState({ onTerminal, onFiles }: { onTerminal: () => void; onFiles: 
         <div className="empty-icon">
           <Terminal size={30} strokeWidth={1.8} />
         </div>
-        <h3>Không gian làm việc trống</h3>
-        <p>Mở terminal hoặc xem file tài liệu để bắt đầu</p>
+        <h3>Workspace is empty</h3>
+        <p>Open a terminal or preview a document to get started</p>
         <div className="empty-actions">
           <button className="empty-btn primary" onClick={onTerminal}>
             <Plus size={14} />
-            <span>Mở Terminal mới</span>
+            <span>Open new terminal</span>
           </button>
           <button className="empty-btn secondary" onClick={onFiles}>
             <Folder size={14} />
-            <span>Duyệt tệp</span>
+            <span>Browse files</span>
           </button>
         </div>
         <div className="empty-hints">
-          <span><kbd>Ctrl+K</kbd> Bảng lệnh · <kbd>Win + ← ↑ ↓ →</kbd> Snap block</span>
+          <span><kbd>Ctrl+K</kbd> Command palette · <kbd>Win + ← ↑ ↓ →</kbd> Snap panel</span>
         </div>
       </div>
     </div>

@@ -131,7 +131,7 @@ pub fn system_info() -> SystemInfo {
             user: std::env::var("USERNAME").unwrap_or_else(|_| "user".into()),
             shell: crate::pty::session::default_shell(),
             cpu: registry_text(r"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString")
-                .unwrap_or_else(|| "Bộ xử lý Windows".into())
+                .unwrap_or_else(|| "Windows processor".into())
                 .trim()
                 .to_string(),
             cores: std::thread::available_parallelism().map(|count| count.get()).unwrap_or(1),
@@ -148,7 +148,7 @@ pub fn system_info() -> SystemInfo {
         hostname: std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".into()),
         user: std::env::var("USER").unwrap_or_else(|_| "user".into()),
         shell: std::env::var("SHELL").unwrap_or_else(|_| "sh".into()),
-        cpu: "Bộ xử lý".into(),
+        cpu: "Processor".into(),
         cores: std::thread::available_parallelism().map(|count| count.get()).unwrap_or(1),
         gpu: String::new(),
     }

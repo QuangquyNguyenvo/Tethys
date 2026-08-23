@@ -5,6 +5,7 @@ import { PanelHeader, type HeadAction } from "../panel/PanelHeader";
 import { usePanelWidth } from "../panel/usePanelWidth";
 import {
   ArrowUp,
+  Check,
   Columns2,
   Copy,
   ExternalLink,
@@ -12,6 +13,7 @@ import {
   File,
   Folder,
   FolderOpen,
+  Pencil,
   RotateCw,
   Rows2,
   TerminalSquare,
@@ -49,37 +51,46 @@ export function ExplorerPanel({ panelKey, path }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationDraft, setLocationDraft] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const { ref: barRef, width } = usePanelWidth<HTMLDivElement>();
+  const focused = useSessions((s) => s.focused);
   const updatePanel = useSessions((s) => s.updatePanel);
   const openPreview = useSessions((s) => s.openPreview);
   const split = useSessions((s) => s.split);
   const { menu, openMenu, closeMenu } = useContextMenu();
 
   const load = useCallback(
-    (target?: string) => {
+    async (target?: string): Promise<boolean> => {
       setLoading(true);
-      invoke<DirListing>("fs_list_dir", { path: target ?? null })
-        .then((res) => {
-          setListing(res);
-          setError(null);
-          setFilter("");
-          // Ghi lại vào store để đổi workspace / mở lại app vẫn đúng thư mục.
-          if (res.path !== path) updatePanel(panelKey, { path: res.path });
-        })
-        .catch((e) => setError(String(e)))
-        .finally(() => setLoading(false));
+      setError(null);
+      try {
+        const res = await invoke<DirListing>("fs_list_dir", { path: target ?? null });
+        setListing(res);
+        setLocationDraft(res.path);
+        setFilter("");
+        // Ghi lại vào store để đổi workspace / mở lại app vẫn đúng thư mục.
+        if (res.path !== path) updatePanel(panelKey, { path: res.path });
+        return true;
+      } catch (reason) {
+        setError(String(reason));
+        return false;
+      } finally {
+        setLoading(false);
+      }
     },
     [panelKey, path, updatePanel],
   );
 
   useEffect(() => {
-    load(path);
+    void load(path);
     // Chỉ nạp khi panel mở lần đầu; điều hướng về sau do `go()` lo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const go = (target: string) => load(target);
+  const go = (target: string) => void load(target);
 
   const entries = useMemo(() => {
     if (!listing) return [];
@@ -89,6 +100,44 @@ export function ExplorerPanel({ panelKey, path }: Props) {
 
   const cur = listing?.path ?? path ?? "";
   const basename = cur.split(/[/\\]/).filter(Boolean).pop() ?? cur;
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const copyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!editingLocation) setLocationDraft(cur);
+  }, [cur, editingLocation]);
+
+  const beginLocationEdit = useCallback(() => {
+    setLocationDraft(cur);
+    setEditingLocation(true);
+    window.requestAnimationFrame(() => locationInputRef.current?.select());
+  }, [cur]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        focused === panelKey &&
+        event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        event.code === "KeyL"
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        beginLocationEdit();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [beginLocationEdit, focused, panelKey]);
+
+  useEffect(
+    () => () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    },
+    [],
+  );
 
   // Đường dẫn dài thì chặng cuối mới là chặng đang đứng — cuộn về cuối, đừng để nó
   // nằm khuất bên phải trong khi phần hiện ra là "D: › Code ›".
@@ -105,45 +154,52 @@ export function ExplorerPanel({ panelKey, path }: Props) {
     split(d, { type: "terminal", cwd: dir }, panelKey);
 
   const copyPath = (p: string) => {
-    navigator.clipboard.writeText(p).catch(() => {});
+    navigator.clipboard
+      .writeText(p)
+      .then(() => {
+        setCopied(true);
+        if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = window.setTimeout(() => setCopied(false), 1_400);
+      })
+      .catch(() => {});
   };
 
   const entryMenu = (e: DirEntryInfo): MenuItem[] => [
     e.is_dir
       ? {
           id: "open",
-          label: "Mở thư mục",
+          label: "Open folder",
           icon: <FolderOpen size={13} />,
           onClick: () => go(e.path),
         }
       : {
           id: "open",
-          label: "Xem trước",
+          label: "Preview",
           icon: <Eye size={13} />,
           onClick: () => openPreview(e.path),
         },
     {
       id: "term",
-      label: e.is_dir ? "Mở terminal tại thư mục này" : "Mở terminal tại thư mục chứa",
+      label: e.is_dir ? "Open terminal in this folder" : "Open terminal in containing folder",
       icon: <TerminalSquare size={13} />,
       onClick: () => openTerminal(cwdFor(e)),
     },
     {
       id: "term-down",
-      label: "Mở terminal ở dưới",
+      label: "Open terminal below",
       icon: <Rows2 size={13} />,
       onClick: () => openTerminal(cwdFor(e), "col"),
     },
     {
       id: "copy",
-      label: "Sao chép đường dẫn",
+      label: "Copy path",
       icon: <Copy size={13} />,
       sep: true,
       onClick: () => copyPath(e.path),
     },
     {
       id: "external",
-      label: e.is_dir ? "Mở bằng File Explorer" : "Mở bằng ứng dụng mặc định",
+      label: e.is_dir ? "Open in File Explorer" : "Open with default app",
       icon: <ExternalLink size={13} />,
       onClick: () => {
         invoke("fs_open_external", { path: e.path }).catch(() => {});
@@ -151,7 +207,7 @@ export function ExplorerPanel({ panelKey, path }: Props) {
     },
     {
       id: "reveal",
-      label: "Hiện trong File Explorer",
+      label: "Show in File Explorer",
       icon: <Folder size={13} />,
       onClick: () => {
         invoke("fs_reveal", { path: e.path }).catch(() => {});
@@ -163,19 +219,19 @@ export function ExplorerPanel({ panelKey, path }: Props) {
   const dirMenu = (): MenuItem[] => [
     {
       id: "term",
-      label: "Mở terminal tại thư mục này",
+      label: "Open terminal in this folder",
       icon: <TerminalSquare size={13} />,
       onClick: () => openTerminal(cur),
     },
     {
       id: "term-right",
-      label: "Mở terminal bên phải",
+      label: "Open terminal to the right",
       icon: <Columns2 size={13} />,
       onClick: () => openTerminal(cur, "row"),
     },
     {
       id: "up",
-      label: "Lên thư mục cha",
+      label: "Go to parent folder",
       icon: <ArrowUp size={13} />,
       sep: true,
       disabled: !listing?.parent,
@@ -183,20 +239,20 @@ export function ExplorerPanel({ panelKey, path }: Props) {
     },
     {
       id: "reload",
-      label: "Nạp lại",
+      label: "Reload",
       icon: <RotateCw size={13} />,
       onClick: () => load(cur),
     },
     {
       id: "copy",
-      label: "Sao chép đường dẫn thư mục",
+      label: "Copy folder path",
       icon: <Copy size={13} />,
       sep: true,
       onClick: () => copyPath(cur),
     },
     {
       id: "reveal",
-      label: "Hiện trong File Explorer",
+      label: "Show in File Explorer",
       icon: <Folder size={13} />,
       onClick: () => {
         invoke("fs_reveal", { path: cur }).catch(() => {});
@@ -207,21 +263,21 @@ export function ExplorerPanel({ panelKey, path }: Props) {
   const actions: HeadAction[] = [
     {
       id: "up",
-      label: "Lên thư mục cha",
+      label: "Go to parent folder",
       inline: true,
       icon: <ArrowUp size={12} />,
       onClick: () => listing?.parent && go(listing.parent),
     },
     {
       id: "reload",
-      label: "Nạp lại",
+      label: "Reload",
       inline: true,
       icon: <RotateCw size={12} />,
       onClick: () => load(cur),
     },
     {
       id: "term-here",
-      label: "Mở terminal tại thư mục này",
+      label: "Open terminal in this folder",
       icon: <TerminalSquare size={12} />,
       onClick: () => split("row", { type: "terminal", cwd: cur }, panelKey),
     },
@@ -233,42 +289,78 @@ export function ExplorerPanel({ panelKey, path }: Props) {
         panelKey={panelKey}
         kind="explorer"
         icon={<Folder size={13} />}
-        title={basename || "Tệp"}
+        title={basename || "Files"}
         subtitle={cur}
-        chips={listing && <span className="chip">{listing.entries.length} mục</span>}
+        chips={listing && <span className="chip">{listing.entries.length} items</span>}
         actions={actions}
       />
 
       {/* Đường dẫn cuộn ngang được, ô lọc giữ bề ngang cố định. Để chung một khối cuộn thì
           ô lọc trôi mất theo đường dẫn dài; panel quá hẹp thì bỏ ô lọc chứ không bóp nó. */}
       <div className="ex-bar" ref={barRef}>
-        <div className="ex-crumbs" ref={crumbsRef}>
-          {crumbs(cur).map((c) => (
-            <button key={c.path} className="ex-crumb" onClick={() => go(c.path)} title={c.path}>
-              {c.name}
-            </button>
-          ))}
+        <div className="ex-location">
+          {editingLocation ? (
+            <form
+              className="ex-location-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const target = locationDraft.trim();
+                if (!target) return;
+                void load(target).then((ok) => ok && setEditingLocation(false));
+              }}
+            >
+              <input
+                ref={locationInputRef}
+                className="ex-location-input"
+                value={locationDraft}
+                onChange={(event) => setLocationDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setLocationDraft(cur);
+                    setEditingLocation(false);
+                  }
+                }}
+                aria-label="Folder path"
+                spellCheck={false}
+              />
+            </form>
+          ) : (
+            <div className="ex-crumbs" ref={crumbsRef}>
+              {crumbs(cur).map((c) => (
+                <button key={c.path} className="ex-crumb" onClick={() => go(c.path)} title={c.path}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <button className="ex-path-action" onClick={() => copyPath(cur)} title="Copy folder path">
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+          <button className="ex-path-action icon-only" onClick={beginLocationEdit} title="Edit folder path (Ctrl+L)" aria-label="Edit folder path">
+            <Pencil size={13} />
+          </button>
         </div>
-        {width >= 240 && (
+        {width >= 440 && (
           <input
             className="ex-filter"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Lọc…"
+            placeholder="Filter…"
             spellCheck={false}
           />
         )}
       </div>
 
       <div className="ex-list" onContextMenu={(e) => openMenu(e, dirMenu())}>
-        {loading && <div className="pv-loading">Đang đọc thư mục…</div>}
-        {error && <div className="pv-err">{error}</div>}
+        {loading && <div className="ex-status">Reading folder…</div>}
+        {error && <div className="ex-error" role="alert">{error}</div>}
         {!loading && !error && entries.length === 0 && (
-          <div className="pv-loading">{filter ? "Không khớp mục nào" : "Thư mục trống"}</div>
+          <div className="pv-loading">{filter ? "No matching items" : "Folder is empty"}</div>
         )}
-        {!loading &&
-          !error &&
-          entries.map((e) => (
+        {entries.map((e) => (
             <button
               key={e.path}
               className={"ex-row" + (e.is_dir ? " dir" : "")}

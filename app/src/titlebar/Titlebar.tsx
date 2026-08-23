@@ -89,21 +89,21 @@ export function Titlebar({
   const handleMinimize = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     invoke("app_window_minimize").catch(() => {
-      appWindow?.minimize().catch((err) => console.error("Lỗi minimize:", err));
+      appWindow?.minimize().catch((err) => console.error("Could not minimize:", err));
     });
   };
 
   const handleMaximize = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     invoke("app_window_toggle_maximize").catch(() => {
-      appWindow?.toggleMaximize().catch((err) => console.error("Lỗi maximize:", err));
+      appWindow?.toggleMaximize().catch((err) => console.error("Could not maximize:", err));
     });
   };
 
   const handleClose = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     invoke("app_window_close").catch(() => {
-      appWindow?.close().catch((err) => console.error("Lỗi close:", err));
+      appWindow?.close().catch((err) => console.error("Could not close:", err));
     });
   };
 
@@ -162,7 +162,7 @@ export function Titlebar({
                   }}
                   title={
                     (idx < 9 ? `${t.name} — Alt+${idx + 1}` : t.name) +
-                    (tabs.length > 1 ? " · Nhấn chuột giữa để đóng" : "")
+                    (tabs.length > 1 ? " · Middle-click to close" : "")
                   }
                 >
                   <span className="tab-face">
@@ -175,7 +175,7 @@ export function Titlebar({
                           e.stopPropagation();
                           onCloseTab(t.id);
                         }}
-                        title="Đóng không gian làm việc"
+                        title="Close workspace"
                       >
                         <X size={11} />
                       </button>
@@ -185,7 +185,7 @@ export function Titlebar({
                 </div>
               );
             })}
-            <button className="tab-add" onClick={onAddTab} title="Thêm không gian làm việc">
+            <button className="tab-add" onClick={onAddTab} title="Add workspace">
               <Plus size={13} />
             </button>
           </div>
@@ -201,7 +201,7 @@ export function Titlebar({
               className="win-btn"
               onClick={handleMinimize}
               onMouseDown={(e) => e.stopPropagation()}
-              title="Thu nhỏ"
+              title="Minimize"
             >
               <Minus size={13} />
             </button>
@@ -209,7 +209,7 @@ export function Titlebar({
               className="win-btn"
               onClick={handleMaximize}
               onMouseDown={(e) => e.stopPropagation()}
-              title="Phóng to / Khôi phục"
+              title="Maximize / Restore"
             >
               <Square size={11} />
             </button>
@@ -217,7 +217,7 @@ export function Titlebar({
               className="win-btn close"
               onClick={handleClose}
               onMouseDown={(e) => e.stopPropagation()}
-              title="Đóng"
+              title="Close"
             >
               <X size={13} />
             </button>

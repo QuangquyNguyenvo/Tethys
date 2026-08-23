@@ -16,18 +16,18 @@ pub struct FileStat {
 pub fn fs_read_text(path: String) -> Result<String, String> {
     let p = Path::new(&path);
     if !p.exists() {
-        return Err(format!("File không tồn tại: {path}"));
+        return Err(format!("File does not exist: {path}"));
     }
 
     let meta = fs::metadata(p).map_err(|e| e.to_string())?;
     if meta.len() > MAX_READ_BYTES {
         return Err(format!(
-            "File quá lớn để xem trực tiếp ({} MB > 5 MB)",
+            "File is too large to preview directly ({} MB > 5 MB)",
             meta.len() / (1024 * 1024)
         ));
     }
 
-    fs::read_to_string(p).map_err(|e| format!("Không thể đọc nội dung UTF-8: {e}"))
+    fs::read_to_string(p).map_err(|e| format!("Could not read UTF-8 content: {e}"))
 }
 
 #[tauri::command]
@@ -95,7 +95,7 @@ pub fn fs_resolve_path(base: Option<String>, target: String) -> Result<String, S
         let clean = s.strip_prefix(r"\\?\").unwrap_or(&s).to_string();
         Ok(clean)
     } else {
-        Err(format!("File không tồn tại: {}", candidate.display()))
+        Err(format!("File does not exist: {}", candidate.display()))
     }
 }
 
@@ -135,7 +135,7 @@ pub fn fs_list_dir(path: Option<String>) -> Result<DirListing, String> {
 
     let dir = dir.canonicalize().unwrap_or(dir);
     if !dir.is_dir() {
-        return Err(format!("Không phải thư mục: {}", clean(&dir)));
+        return Err(format!("Not a directory: {}", clean(&dir)));
     }
 
     let mut entries: Vec<DirEntryInfo> = Vec::new();

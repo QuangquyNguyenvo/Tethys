@@ -187,21 +187,21 @@ export function AudioVisualizer({ active = true }: Props) {
           <button
             className={"audio-viz-btn" + (mode === "dual" ? " on" : "")}
             onClick={() => setMode("dual")}
-            title="Sóng âm & Cột tần số kết hợp"
+            title="Combined waveform and frequency bars"
           >
             Dual
           </button>
           <button
             className={"audio-viz-btn" + (mode === "cava" ? " on" : "")}
             onClick={() => setMode("cava")}
-            title="Cột Equalizer CAVA"
+            title="CAVA equalizer bars"
           >
             Bars
           </button>
           <button
             className={"audio-viz-btn" + (mode === "wave" ? " on" : "")}
             onClick={() => setMode("wave")}
-            title="Dao động ký Oscilloscope"
+            title="Oscilloscope waveform"
           >
             Wave
           </button>

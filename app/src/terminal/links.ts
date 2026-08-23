@@ -79,7 +79,7 @@ export function registerFileLinkProvider(
                 onOpen(resolved);
               }
             } catch (err) {
-              console.warn("Không thể mở file từ terminal link:", err);
+              console.warn("Could not open file from terminal link:", err);
             }
         });
       }

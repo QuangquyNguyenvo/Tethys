@@ -81,7 +81,7 @@ export function CommandPalette({ isOpen, onClose, commands }: Props) {
             ref={inputRef}
             type="text"
             className="palette-input"
-            placeholder="Gõ lệnh hoặc tìm kiếm thao tác..."
+            placeholder="Type a command or search actions..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -90,7 +90,7 @@ export function CommandPalette({ isOpen, onClose, commands }: Props) {
 
         <div className="palette-list" ref={listRef}>
           {filtered.length === 0 ? (
-            <div className="palette-empty">Không tìm thấy lệnh phù hợp</div>
+            <div className="palette-empty">No matching commands found</div>
           ) : (
             filtered.map((cmd, idx) => (
               <div

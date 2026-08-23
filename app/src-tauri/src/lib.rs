@@ -155,6 +155,15 @@ fn app_window_close(window: tauri::Window) {
 }
 
 #[tauri::command]
+fn app_window_toggle_fullscreen(window: tauri::Window) -> Result<bool, String> {
+    let next = !window.is_fullscreen().map_err(|error| error.to_string())?;
+    window
+        .set_fullscreen(next)
+        .map_err(|error| error.to_string())?;
+    Ok(next)
+}
+
+#[tauri::command]
 fn app_window_set_vibrancy(window: tauri::Window, enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -210,8 +219,11 @@ pub fn run() {
             system::system_info,
             system::system_metrics,
             audio::audio_levels,
+            audio::audio_set_active,
+            audio::now_playing,
             wallpaper::wallpaper_path,
             wallpaper::wallpaper_pick,
+            wallpaper::sysfetch_logo_pick,
             theme_report,
             boot_panels,
             boot_preview,
@@ -229,6 +241,7 @@ pub fn run() {
             app_window_minimize,
             app_window_toggle_maximize,
             app_window_close,
+            app_window_toggle_fullscreen,
             app_window_set_vibrancy
         ])
         .run(tauri::generate_context!())

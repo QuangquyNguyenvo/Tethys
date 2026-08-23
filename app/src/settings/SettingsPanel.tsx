@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Keyboard, LayoutGrid, Palette, Settings, Terminal } from "lucide-react";
 import { PanelHeader } from "../panel/PanelHeader";
 import { useThemeStore, refreshSeed, setCustomWallpaper, useDesktopWallpaper } from "../theme/useTheme";
@@ -15,42 +15,44 @@ import {
 const SCHEMES: SchemeName[] = ["TonalSpot", "Vibrant", "Expressive", "Neutral", "Content", "Monochrome"];
 
 const SOURCES: { id: ColorSource; name: string; note: string }[] = [
-  { id: "brand", name: "Tethys", note: "Teal và navy lấy thẳng từ logo. Giống nhau trên mọi máy." },
-  { id: "wallpaper", name: "Wallpaper", note: "Material You trích màu gốc từ ảnh nền desktop." },
+  { id: "brand", name: "Tethys", note: "Teal and navy are taken directly from the logo. Consistent on every device." },
+  { id: "wallpaper", name: "Wallpaper", note: "Material You extracts the source colors from your desktop wallpaper." },
 ];
 
 const SURFACES: { id: SurfaceStyle; name: string; note: string }[] = [
-  { id: "flat", name: "Phẳng", note: "Bề mặt đặc, viền rõ, không blur, không ảnh nền." },
-  { id: "glass", name: "Kính", note: "Chrome mờ, nhìn xuyên xuống ảnh nền phía sau." },
+  { id: "flat", name: "Flat", note: "Solid surfaces, crisp borders, no blur or wallpaper." },
+  { id: "glass", name: "Glass", note: "Translucent chrome that reveals the wallpaper underneath." },
 ];
 
 const LAYOUTS: { id: LayoutMode; name: string; note: string }[] = [
-  { id: "spiral", name: "Xoắn ốc", note: "Xen kẽ ngang và dọc, luôn chia block vừa mở." },
-  { id: "dwindle", name: "Cạnh dài", note: "Tự chọn chiều chia theo cạnh dài hơn của block." },
-  { id: "manual", name: "Sang phải", note: "Block mới luôn xuất hiện ở bên phải." },
+  { id: "spiral", name: "Spiral", note: "Alternates horizontal and vertical splits, always splitting the newest panel." },
+  { id: "dwindle", name: "Longest side", note: "Automatically splits along the panel's longest side." },
+  { id: "manual", name: "To the right", note: "New panels always appear on the right." },
 ];
 
 const KEYS: { keys: string[]; what: string }[] = [
-  { keys: ["Ctrl", "T"], what: "Terminal mới" },
-  { keys: ["Ctrl", "W"], what: "Đóng block" },
-  { keys: ["Alt", "1…9"], what: "Chuyển workspace" },
-  { keys: ["Win", "← ↑ ↓ →"], what: "Snap block đang chọn" },
-  { keys: ["Ctrl", "Alt", "← ↑ ↓ →"], what: "Snap block (thay cho phím Win)" },
-  { keys: ["Ctrl", "Shift", "E / O"], what: "Đặt block sang phải / xuống dưới" },
-  { keys: ["Ctrl", "Shift", "D"], what: "Nhân đôi block" },
-  { keys: ["Ctrl", "Shift", "Tab"], what: "Block kế tiếp" },
-  { keys: ["Ctrl", "K"], what: "Bảng lệnh" },
-  { keys: ["Ctrl", ","], what: "Cài đặt" },
-  { keys: ["Ctrl", "↑ / ↓"], what: "Nhảy giữa các lệnh" },
+  { keys: ["Ctrl", "T"], what: "New terminal" },
+  { keys: ["Ctrl", "W"], what: "Close panel" },
+  { keys: ["Ctrl", "1 / 3"], what: "Previous / next workspace" },
+  { keys: ["Alt", "1…9"], what: "Switch workspace" },
+  { keys: ["Win", "← ↑ ↓ →"], what: "Snap the selected panel" },
+  { keys: ["Ctrl", "Alt", "← ↑ ↓ →"], what: "Snap panel (alternative to the Windows key)" },
+  { keys: ["Ctrl", "Shift", "E / O"], what: "Place panel right / below" },
+  { keys: ["Ctrl", "Shift", "D"], what: "Duplicate panel" },
+  { keys: ["Ctrl", "Shift", "Tab"], what: "Next panel" },
+  { keys: ["Ctrl", "K"], what: "Command palette" },
+  { keys: ["Ctrl", ","], what: "Settings" },
+  { keys: ["F11", "or", "Alt", "Enter"], what: "Toggle fullscreen" },
+  { keys: ["Ctrl", "↑ / ↓"], what: "Jump between commands" },
 ];
 
 type Page = "appearance" | "terminal" | "layout" | "keys";
 
 const PAGES: { id: Page; label: string; icon: ReactNode }[] = [
-  { id: "appearance", label: "Giao diện", icon: <Palette size={15} /> },
+  { id: "appearance", label: "Appearance", icon: <Palette size={15} /> },
   { id: "terminal", label: "Terminal", icon: <Terminal size={15} /> },
-  { id: "layout", label: "Block", icon: <LayoutGrid size={15} /> },
-  { id: "keys", label: "Phím tắt", icon: <Keyboard size={15} /> },
+  { id: "layout", label: "Layout", icon: <LayoutGrid size={15} /> },
+  { id: "keys", label: "Shortcuts", icon: <Keyboard size={15} /> },
 ];
 
 export function SettingsPanel({ panelKey }: { panelKey: string }) {
@@ -59,6 +61,22 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
   const source = useThemeStore((s) => s.source);
   const wallpaper = useThemeStore((s) => s.wallpaper);
   const [page, setPage] = useState<Page>("appearance");
+  const [logoMissing, setLogoMissing] = useState(false);
+
+  useEffect(() => {
+    const path = opts.sysfetchLogoPath;
+    if (!path) {
+      setLogoMissing(false);
+      return;
+    }
+    let current = true;
+    invoke("fs_stat", { path })
+      .then(() => current && setLogoMissing(false))
+      .catch(() => current && setLogoMissing(true));
+    return () => {
+      current = false;
+    };
+  }, [opts.sysfetchLogoPath]);
 
   return (
     <div className="panel settings-panel">
@@ -66,15 +84,15 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
         panelKey={panelKey}
         kind="settings"
         icon={<Settings size={13} />}
-        title="Cài đặt"
+        title="Settings"
         subtitle={sourceLabel(opts.colorSource, source, wallpaper)}
       />
 
       <div className="settings-shell">
-        <aside className="set-sidebar" aria-label="Danh mục cài đặt">
+        <aside className="set-sidebar" aria-label="Settings categories">
           <div className="set-sidebar-title">
-            <span>Tùy chỉnh</span>
-            <small>Mọi thay đổi được lưu tự động</small>
+            <span>Customize</span>
+            <small>All changes are saved automatically</small>
           </div>
           <nav className="set-nav">
             {PAGES.map((item) => (
@@ -93,19 +111,19 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
             <span className={source === "fallback" ? "source-dot" : "source-dot live"} />
             <span>
               {opts.colorSource === "brand"
-                ? "Màu thương hiệu Tethys"
+                ? "Tethys brand colors"
                 : source === "wallpaper"
-                  ? "Màu theo wallpaper"
-                  : "Màu dự phòng"}
+                  ? "Wallpaper colors"
+                  : "Fallback colors"}
             </span>
           </div>
         </aside>
 
         <div className="set-content">
           {page === "appearance" && (
-            <SettingsPage title="Giao diện" description="Ít chrome hơn, nhiều không gian làm việc hơn.">
-              <SettingGroup title="Bảng màu" description="Chọn màu đến từ logo Tethys hay từ ảnh nền desktop.">
-                <ChoiceRow label="Nguồn màu">
+            <SettingsPage title="Appearance" description="Less chrome, more room for your workspace.">
+              <SettingGroup title="Color palette" description="Choose colors from the Tethys logo or your desktop wallpaper.">
+                <ChoiceRow label="Color source">
                   {SOURCES.map((item) => (
                     <button
                       key={item.id}
@@ -126,7 +144,7 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                     làm gì cả — tệ hơn hẳn so với việc nó vắng mặt. */}
                 {opts.colorSource === "wallpaper" && (
                   <>
-                    <ChoiceRow label="Phong cách màu">
+                    <ChoiceRow label="Color style">
                       {SCHEMES.map((scheme) => (
                         <button
                           key={scheme}
@@ -138,17 +156,17 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                       ))}
                     </ChoiceRow>
                     <ActionRow
-                      label="Đồng bộ wallpaper"
-                      note="Trích lại màu nếu bạn vừa đổi ảnh nền."
-                      action="Làm mới màu"
+                      label="Sync wallpaper"
+                      note="Extract colors again after changing your wallpaper."
+                      action="Refresh colors"
                       onClick={() => refreshSeed()}
                     />
                   </>
                 )}
               </SettingGroup>
 
-              <SettingGroup title="Bề mặt" description="Chất liệu của các lớp chrome bao quanh nội dung.">
-                <ChoiceRow label="Kiểu bề mặt">
+              <SettingGroup title="Surface" description="The material of the chrome around your content.">
+                <ChoiceRow label="Surface style">
                   {SURFACES.map((item) => (
                     <button
                       key={item.id}
@@ -165,12 +183,12 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                 </div>
               </SettingGroup>
 
-              <SettingGroup title="Hình nền" description="Đổi nền riêng của app, không chạm tới ảnh nền Windows.">
+              <SettingGroup title="Wallpaper" description="Change the app background without changing your Windows wallpaper.">
                 <div className="set-list">
                   <ActionRow
-                    label="Ảnh nền workspace"
-                    note={wallpaper ? wallpaper : "Đang dùng ảnh nền Desktop."}
-                    action="Chọn ảnh"
+                    label="Workspace wallpaper"
+                    note={wallpaper ? wallpaper : "Using your desktop wallpaper."}
+                    action="Choose image"
                     onClick={() => {
                       invoke<string | null>("wallpaper_pick")
                         .then((path) => {
@@ -186,9 +204,9 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                     }}
                   />
                   <ActionRow
-                    label="Quay về Desktop"
-                    note="Dùng lại ảnh nền Windows hiện tại."
-                    action="Khôi phục"
+                    label="Use desktop wallpaper"
+                    note="Use your current Windows wallpaper again."
+                    action="Restore"
                     onClick={() => {
                       setOpts({ surfaceStyle: "glass", colorSource: "wallpaper" });
                       void useDesktopWallpaper();
@@ -197,26 +215,53 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                 </div>
               </SettingGroup>
 
-              <SettingGroup title="Chrome" description="Các lớp nổi bao quanh nội dung.">
-                <Toggle id="set-nav" label="Thanh điều hướng tự ẩn" note="Rê chuột lên mép trên để gọi lại." checked={opts.navAutoHide} onChange={(v) => setOpts({ navAutoHide: v })} />
-                <Toggle id="set-dock" label="Dock tự ẩn" note="Rê chuột xuống mép dưới để gọi lại." checked={opts.dockAutoHide} onChange={(v) => setOpts({ dockAutoHide: v })} />
-                <Toggle id="set-dark" label="Theme tối" note="Tối ưu cho phiên terminal dài." checked={opts.dark} onChange={(v) => setOpts({ dark: v })} />
-                <Toggle id="set-vibrancy" label="Mica / Acrylic" note="Cho wallpaper hòa vào bề mặt cửa sổ." checked={opts.windowVibrancy !== false} onChange={(v) => setOpts({ windowVibrancy: v })} />
-                <Toggle id="set-blur" label="Làm mờ bề mặt" note="Tắt để ưu tiên FPS và pin khi output nặng." checked={opts.blurEffects !== false} onChange={(v) => setOpts({ blurEffects: v })} />
+              <SettingGroup title="Sysfetch logo" description="This image replaces the TETHYS text logo in the system information panel.">
+                <div className="set-list">
+                  <ActionRow
+                    label="Logo image"
+                    note={
+                      logoMissing
+                        ? "Saved logo is missing — choose the image again."
+                        : opts.sysfetchLogoPath
+                          ? fileName(opts.sysfetchLogoPath)
+                          : "Using the TETHYS text logo."
+                    }
+                    action="Choose image"
+                    onClick={() => {
+                      invoke<string | null>("sysfetch_logo_pick")
+                        .then((path) => path && setOpts({ sysfetchLogoPath: path }))
+                        .catch(() => {});
+                    }}
+                  />
+                  <ActionRow
+                    label="Restore text logo"
+                    note="Remove the selected image and return to the ASCII TETHYS logo."
+                    action="Restore"
+                    onClick={() => setOpts({ sysfetchLogoPath: "" })}
+                  />
+                </div>
+              </SettingGroup>
+
+              <SettingGroup title="Chrome" description="The floating layers around your content.">
+                <Toggle id="set-nav" label="Auto-hide navigation bar" note="Move the pointer to the top edge to reveal it." checked={opts.navAutoHide} onChange={(v) => setOpts({ navAutoHide: v })} />
+                <Toggle id="set-dock" label="Auto-hide dock" note="Move the pointer to the bottom edge to reveal it." checked={opts.dockAutoHide} onChange={(v) => setOpts({ dockAutoHide: v })} />
+                <Toggle id="set-dark" label="Dark theme" note="Optimized for long terminal sessions." checked={opts.dark} onChange={(v) => setOpts({ dark: v })} />
+                <Toggle id="set-vibrancy" label="Mica / Acrylic" note="Blend the wallpaper into the window surface." checked={opts.windowVibrancy !== false} onChange={(v) => setOpts({ windowVibrancy: v })} />
+                <Toggle id="set-blur" label="Blur surfaces" note="Turn off to prioritize FPS and battery life with heavy output." checked={opts.blurEffects !== false} onChange={(v) => setOpts({ blurEffects: v })} />
               </SettingGroup>
             </SettingsPage>
           )}
 
           {page === "terminal" && (
-            <SettingsPage title="Terminal" description="Giữ chữ sắc nét nhưng vẫn thấy chiều sâu của wallpaper.">
-              <SettingGroup title="Bề mặt" description="Chỉ nền terminal thay đổi; chữ luôn giữ tương phản.">
+            <SettingsPage title="Terminal" description="Keep text crisp while preserving the wallpaper's depth.">
+              <SettingGroup title="Surface" description="Only the terminal background changes; text always remains legible.">
                 <Slider
                   id="set-opacity"
-                  label="Độ đục"
+                  label="Opacity"
                   note={
                     opts.surfaceStyle === "flat"
-                      ? "Bề mặt Phẳng luôn đục hẳn — đổi sang Kính để chỉnh."
-                      : "Thấp hơn sẽ thấy wallpaper rõ hơn."
+                      ? "Flat surfaces are always fully opaque — switch to Glass to adjust this."
+                      : "Lower values reveal more of the wallpaper."
                   }
                   disabled={opts.surfaceStyle === "flat"}
                   min={TERM_OPACITY_MIN * 100}
@@ -226,16 +271,16 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                   display={opts.surfaceStyle === "flat" ? "100%" : `${Math.round(opts.termOpacity * 100)}%`}
                   onChange={(v) => setOpts({ termOpacity: v / 100 })}
                 />
-                <Slider id="set-contrast" label="Tương phản" note="0 là mức chuẩn của Material 3." min={-1} max={1} step={0.1} value={opts.contrast} display={opts.contrast.toFixed(1)} onChange={(v) => setOpts({ contrast: v })} />
-                <Slider id="set-chroma" label="Độ rực ANSI" note="Tách màu terminal khỏi phần chrome trung tính." min={1} max={2.5} step={0.05} value={opts.termChroma} display={`${opts.termChroma.toFixed(2)}×`} onChange={(v) => setOpts({ termChroma: v })} />
+                <Slider id="set-contrast" label="Contrast" note="0 is the Material 3 baseline." min={-1} max={1} step={0.1} value={opts.contrast} display={opts.contrast.toFixed(1)} onChange={(v) => setOpts({ contrast: v })} />
+                <Slider id="set-chroma" label="ANSI chroma" note="Separate terminal colors from the neutral chrome." min={1} max={2.5} step={0.05} value={opts.termChroma} display={`${opts.termChroma.toFixed(2)}×`} onChange={(v) => setOpts({ termChroma: v })} />
               </SettingGroup>
             </SettingsPage>
           )}
 
           {page === "layout" && (
-            <SettingsPage title="Block" description="Chia, chuyển và kéo block mà không làm mất session.">
-              <SettingGroup title="Block mới" description="Chọn cách cây layout mở rộng.">
-                <ChoiceRow label="Kiểu chia">
+            <SettingsPage title="Layout" description="Split, switch, and drag panels without losing sessions.">
+              <SettingGroup title="New panels" description="Choose how the layout tree grows.">
+                <ChoiceRow label="Split behavior">
                   {LAYOUTS.map((layout) => (
                     <button
                       key={layout.id}
@@ -248,19 +293,19 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
                   ))}
                 </ChoiceRow>
                 <div className="set-tip">
-                  {LAYOUTS.find((layout) => layout.id === opts.layoutMode)?.note} Dùng nút ‹ › để chuyển block; giữ biểu tượng tay nắm trên header để kéo block tới vị trí mới.
+                  {LAYOUTS.find((layout) => layout.id === opts.layoutMode)?.note} Use the ‹ › buttons to switch panels; drag the handle in a header to move a panel to a new position.
                 </div>
               </SettingGroup>
             </SettingsPage>
           )}
 
           {page === "keys" && (
-            <SettingsPage title="Phím tắt" description="Chỉ giành phím khi nó thật sự giúp workflow nhanh hơn.">
-              <SettingGroup title="Quyền ưu tiên" description="Tắt để trả tổ hợp phím về shell hoặc TUI.">
-                <Toggle id="set-tabkeys" label="Ctrl+T / Ctrl+W" note="Mở và đóng block giống tab trình duyệt." checked={opts.tabShortcuts} onChange={(v) => setOpts({ tabShortcuts: v })} />
-                <Toggle id="set-wskeys" label="Alt+1…9" note="Nhảy thẳng tới workspace tương ứng." checked={opts.workspaceAltKeys} onChange={(v) => setOpts({ workspaceAltKeys: v })} />
+            <SettingsPage title="Shortcuts" description="Only capture keys when they make your workflow faster.">
+              <SettingGroup title="Key priority" description="Turn off to return key combinations to the shell or TUI.">
+                <Toggle id="set-tabkeys" label="Ctrl+T / Ctrl+W" note="Open and close panels like browser tabs." checked={opts.tabShortcuts} onChange={(v) => setOpts({ tabShortcuts: v })} />
+                <Toggle id="set-wskeys" label="Alt+1…9" note="Jump directly to the corresponding workspace." checked={opts.workspaceAltKeys} onChange={(v) => setOpts({ workspaceAltKeys: v })} />
               </SettingGroup>
-              <SettingGroup title="Danh sách phím" description="Các thao tác chính của workspace.">
+              <SettingGroup title="Shortcut list" description="The primary workspace actions.">
                 <div className="set-keylist">
                   {KEYS.map((item) => (
                     <div className="set-key" key={item.keys.join("+")}>
@@ -338,7 +383,11 @@ function sourceLabel(
   source: string,
   wallpaper: string,
 ): string {
-  if (colorSource === "brand") return "bảng màu thương hiệu";
+  if (colorSource === "brand") return "brand color palette";
   if (source === "wallpaper") return wallpaper;
-  return "bảng màu dự phòng";
+  return "fallback color palette";
+}
+
+function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
 }

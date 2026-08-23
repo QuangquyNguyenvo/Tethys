@@ -43,7 +43,7 @@ export function TerminalPanel({ panelKey, shell, cwd, theme, visible }: Props) {
       ? [
           {
             id: "prev",
-            label: "Nhảy tới lệnh trước (Ctrl+↑)",
+            label: "Jump to previous command (Ctrl+↑)",
             // Không `inline`: ba thao tác này có phím tắt, để chúng thành ba nút nữa trên
             // thanh là biến thanh tiêu đề thành hàng biểu tượng. Chúng nằm trong menu `⋯`.
             icon: <path d="M12 19V5M5 12l7-7 7 7" />,
@@ -51,13 +51,13 @@ export function TerminalPanel({ panelKey, shell, cwd, theme, visible }: Props) {
           },
           {
             id: "next",
-            label: "Nhảy tới lệnh sau (Ctrl+↓)",
+            label: "Jump to next command (Ctrl+↓)",
             icon: <path d="M12 5v14M19 12l-7 7-7-7" />,
             onClick: jumpNext,
           },
           {
             id: "copy",
-            label: "Copy output lệnh gần nhất",
+            label: "Copy latest command output",
             icon: (
               <>
                 <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -79,7 +79,7 @@ export function TerminalPanel({ panelKey, shell, cwd, theme, visible }: Props) {
         actions={actions}
         chips={
           <>
-            {running && <span className="chip run">đang chạy</span>}
+            {running && <span className="chip run">running</span>}
             {!running && lastBlock && (
               <span
                 className={
@@ -89,7 +89,7 @@ export function TerminalPanel({ panelKey, shell, cwd, theme, visible }: Props) {
                 {lastBlock.status === "error" ? `exit ${lastBlock.exitCode}` : "0 · ok"}
               </span>
             )}
-            {state === "exited" && <span className="chip err">shell đã thoát</span>}
+            {state === "exited" && <span className="chip err">shell exited</span>}
             {state === "error" && <span className="chip err">{error}</span>}
           </>
         }

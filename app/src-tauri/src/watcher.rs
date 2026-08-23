@@ -1,6 +1,6 @@
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
@@ -12,14 +12,14 @@ pub struct FileChangedPayload {
 
 pub struct WatcherManager {
     watcher: Arc<Mutex<Option<RecommendedWatcher>>>,
-    watched_paths: Arc<Mutex<HashSet<PathBuf>>>,
+    watched_paths: Arc<Mutex<HashMap<PathBuf, usize>>>,
 }
 
 impl Default for WatcherManager {
     fn default() -> Self {
         Self {
             watcher: Arc::new(Mutex::new(None)),
-            watched_paths: Arc::new(Mutex::new(HashSet::new())),
+            watched_paths: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -57,14 +57,17 @@ impl WatcherManager {
         let p = Path::new(path).canonicalize().map_err(|e| e.to_string())?;
 
         let mut paths = self.watched_paths.lock().map_err(|e| e.to_string())?;
-        if !paths.contains(&p) {
-            let mut w_lock = self.watcher.lock().map_err(|e| e.to_string())?;
-            if let Some(ref mut watcher) = *w_lock {
-                watcher
-                    .watch(&p, RecursiveMode::NonRecursive)
-                    .map_err(|e| e.to_string())?;
-                paths.insert(p);
-            }
+        if let Some(references) = paths.get_mut(&p) {
+            *references += 1;
+            return Ok(());
+        }
+
+        let mut w_lock = self.watcher.lock().map_err(|e| e.to_string())?;
+        if let Some(ref mut watcher) = *w_lock {
+            watcher
+                .watch(&p, RecursiveMode::NonRecursive)
+                .map_err(|e| e.to_string())?;
+            paths.insert(p, 1);
         }
         Ok(())
     }
@@ -75,7 +78,18 @@ impl WatcherManager {
         };
 
         let mut paths = self.watched_paths.lock().map_err(|e| e.to_string())?;
-        if paths.remove(&p) {
+        let should_unwatch = match paths.get_mut(&p) {
+            Some(references) if *references > 1 => {
+                *references -= 1;
+                false
+            }
+            Some(_) => {
+                paths.remove(&p);
+                true
+            }
+            None => false,
+        };
+        if should_unwatch {
             let mut w_lock = self.watcher.lock().map_err(|e| e.to_string())?;
             if let Some(ref mut watcher) = *w_lock {
                 let _ = watcher.unwatch(&p);

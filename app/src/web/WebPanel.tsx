@@ -13,7 +13,7 @@ const QUICK = [
   { label: "MDN", url: "https://developer.mozilla.org/" },
   { label: "Rust std", url: "https://doc.rust-lang.org/std/" },
   { label: "Tauri", url: "https://tauri.app/" },
-  { label: "Wikipedia", url: "https://vi.wikipedia.org/" },
+  { label: "Wikipedia", url: "https://en.wikipedia.org/" },
 ];
 
 /**
@@ -78,19 +78,19 @@ export function WebPanel({ panelKey, url }: Props) {
   const actions: HeadAction[] = [
     {
       id: "back",
-      label: "Lùi lại",
+      label: "Back",
       icon: <path d="M15 18l-6-6 6-6" />,
       onClick: () => goRelative(-1),
     },
     {
       id: "fwd",
-      label: "Tiến tới",
+      label: "Forward",
       icon: <path d="M9 18l6-6-6-6" />,
       onClick: () => goRelative(1),
     },
     {
       id: "reload",
-      label: "Nạp lại",
+      label: "Reload",
       icon: (
         <>
           <path d="M21 12a9 9 0 1 1-2.64-6.36" />
@@ -101,7 +101,7 @@ export function WebPanel({ panelKey, url }: Props) {
     },
     {
       id: "external",
-      label: "Mở bằng trình duyệt ngoài",
+      label: "Open in external browser",
       icon: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
       onClick: () => openExternal(),
     },
@@ -129,7 +129,7 @@ export function WebPanel({ panelKey, url }: Props) {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Nhập địa chỉ hoặc từ khoá rồi Enter"
+          placeholder="Enter an address or search term, then press Enter"
           spellCheck={false}
         />
       </form>
@@ -145,7 +145,7 @@ export function WebPanel({ panelKey, url }: Props) {
           />
         ) : (
           <div className="web-start">
-            <p>Nhập địa chỉ ở trên, hoặc mở nhanh:</p>
+            <p>Enter an address above, or open one of these:</p>
             <div className="web-quick">
               {QUICK.map((q) => (
                 <button key={q.url} onClick={() => commit(q.url)}>
@@ -154,11 +154,11 @@ export function WebPanel({ panelKey, url }: Props) {
               ))}
             </div>
             <button className="web-open-default" onClick={() => openExternal()}>
-              Mở trình duyệt mặc định
+              Open default browser
             </button>
             <p className="web-note">
-              Trang nào chặn nhúng (Google, GitHub…) sẽ hiện trắng — dùng nút mở bằng trình
-              duyệt ngoài ở thanh trên.
+              Pages that block embedding (such as Google or GitHub) will appear blank. Use the
+              open-in-external-browser button in the top bar instead.
             </p>
           </div>
         )}

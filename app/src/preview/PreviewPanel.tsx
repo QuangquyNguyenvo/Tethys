@@ -32,28 +32,33 @@ export function PreviewPanel({ panelKey, path, mode = "auto" }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    let requestId = 0;
+    let reloadTimer: number | null = null;
 
     const loadData = () => {
+      const currentRequest = ++requestId;
       invoke<FileStat>("fs_stat", { path })
         .then((st) => {
-          if (!cancelled) setStat(st);
+          if (!cancelled && currentRequest === requestId) setStat(st);
         })
         .catch(() => {});
 
       if (detectedType === "image") {
+        setError(null);
         setLoading(false);
         return;
       }
 
       invoke<string>("fs_read_text", { path })
         .then((txt) => {
-          if (!cancelled) {
+          if (!cancelled && currentRequest === requestId) {
             setContent(txt);
+            setError(null);
             setLoading(false);
           }
         })
         .catch((err) => {
-          if (!cancelled) {
+          if (!cancelled && currentRequest === requestId) {
             setError(String(err));
             setLoading(false);
           }
@@ -73,16 +78,16 @@ export function PreviewPanel({ panelKey, path, mode = "auto" }: Props) {
       const changedPath = event.payload.path.toLowerCase().replace(/\\/g, "/");
       const currentPath = path.toLowerCase().replace(/\\/g, "/");
       if (
-        changedPath === currentPath ||
-        currentPath.endsWith(changedPath) ||
-        changedPath.endsWith(currentPath)
+        changedPath === currentPath
       ) {
-        loadData();
+        if (reloadTimer !== null) window.clearTimeout(reloadTimer);
+        reloadTimer = window.setTimeout(loadData, 100);
       }
     });
 
     return () => {
       cancelled = true;
+      if (reloadTimer !== null) window.clearTimeout(reloadTimer);
       invoke("unwatch_file", { path }).catch(() => {});
       unlistenPromise.then((unlisten) => unlisten()).catch(() => {});
     };
@@ -90,7 +95,7 @@ export function PreviewPanel({ panelKey, path, mode = "auto" }: Props) {
 
   const handleOpenExternal = () => {
     invoke("fs_open_external", { path }).catch((e) => {
-      console.error("Không thể mở app ngoài:", e);
+      console.error("Could not open external app:", e);
     });
   };
 
@@ -101,7 +106,7 @@ export function PreviewPanel({ panelKey, path, mode = "auto" }: Props) {
   if (detectedType === "markdown" || detectedType === "diff") {
     actions.push({
       id: "raw",
-      label: viewMode === "rendered" ? "Xem dạng thô" : "Xem định dạng",
+      label: viewMode === "rendered" ? "View raw" : "View rendered",
       inline: true,
       active: viewMode === "raw",
       icon: <Code size={12} />,
@@ -110,7 +115,7 @@ export function PreviewPanel({ panelKey, path, mode = "auto" }: Props) {
   }
   actions.push({
     id: "external",
-    label: "Mở bằng app ngoài",
+    label: "Open with external app",
     icon: <ExternalLink size={12} />,
     onClick: handleOpenExternal,
   });
@@ -137,7 +142,7 @@ export function PreviewPanel({ panelKey, path, mode = "auto" }: Props) {
       />
 
       <div className="pv">
-        {loading && <div className="pv-loading">Đang đọc file…</div>}
+        {loading && <div className="pv-loading">Reading file…</div>}
         {error && <div className="pv-err">{error}</div>}
         {!loading && !error && (
           <>

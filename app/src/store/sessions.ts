@@ -128,6 +128,7 @@ type SessionStore = {
 
   // Workspaces actions
   switchWorkspace: (id: string) => void;
+  cycleWorkspace: (step: -1 | 1) => void;
   addWorkspace: (name?: string) => string;
   removeWorkspace: (id: string) => void;
   renameWorkspace: (id: string, name: string) => void;
@@ -304,10 +305,13 @@ export const useSessions = create<SessionStore>((set, get) => ({
   remove: (key) =>
     set((s) => {
       if (!s.tree) return s;
+      const previousLeaves = leaves(s.tree);
+      const removedIndex = previousLeaves.indexOf(key);
       const tree = removeLeaf(s.tree, key);
       const rest = leaves(tree);
       const nextPanels = s.panels.filter((x) => x.key !== key);
-      const nextFocused = s.focused === key ? (rest[0] ?? null) : s.focused;
+      const neighborIndex = Math.min(Math.max(removedIndex, 0), Math.max(rest.length - 1, 0));
+      const nextFocused = s.focused === key ? (rest[neighborIndex] ?? null) : s.focused;
 
       const nextWorkspaces = s.workspaces.map((w) =>
         w.id === s.activeWorkspaceId
@@ -456,6 +460,15 @@ export const useSessions = create<SessionStore>((set, get) => ({
       panels: target.panels,
       focused: target.focused,
     });
+  },
+
+  cycleWorkspace: (step) => {
+    const { workspaces, activeWorkspaceId } = get();
+    if (workspaces.length < 2) return;
+    const activeIndex = workspaces.findIndex((workspace) => workspace.id === activeWorkspaceId);
+    const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+    const targetIndex = (currentIndex + step + workspaces.length) % workspaces.length;
+    get().switchWorkspace(workspaces[targetIndex].id);
   },
 
   addWorkspace: (name) => {
