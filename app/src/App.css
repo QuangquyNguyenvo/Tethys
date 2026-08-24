@@ -390,6 +390,14 @@ body {
   contain: layout paint style;
 }
 
+/* `paint` containment clips the backdrop sampling area at the tile boundary. WebView2
+   redraws that clipped edge when a child changes on hover, which shows up as a dark
+   full-height seam between translucent terminals. Solid panels keep paint containment;
+   terminal panels only need layout/style isolation so their blur can sample continuously. */
+.panel-host[data-panel-type="terminal"] {
+  contain: layout style;
+}
+
 /* Kéo gutter và kéo panel phải bám tay tức thì — có transition là thành cao su. */
 body.resizing-layout .panel-host,
 body.dragging-panel .panel-host,
@@ -579,10 +587,10 @@ body.dragging-panel .panel-head { cursor: grabbing; }
    Mở bốn panel là bốn hàng biểu tượng cùng lúc đập vào mắt — mà mỗi lúc ta chỉ thao tác
    trên đúng một panel. Vẫn bấm được khi mờ (`pointer-events` không tắt): rê tới là nó
    hiện trước khi kịp bấm, và trình đo tự động vẫn chạm được. */
-.panel-actions { opacity: 0; transition: opacity 140ms var(--e-standard); }
+.panel-actions { visibility: hidden; }
 .panel-host.on .panel-actions,
 .panel:hover .panel-actions,
-.panel-actions:focus-within { opacity: 1; }
+.panel-actions:focus-within { visibility: visible; }
 
 /* Panel hẹp tới mức không còn chỗ cho chữ: chỉ giữ chấm màu và nút `⋯`. */
 .panel-head.minimal { padding: 0 4px 0 7px; gap: 4px; }
