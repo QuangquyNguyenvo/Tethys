@@ -1,8 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Keyboard, LayoutGrid, Palette, Settings, Terminal } from "lucide-react";
+import { Keyboard, LayoutGrid, Palette, RefreshCw, Settings, Terminal } from "lucide-react";
 import { PanelHeader } from "../panel/PanelHeader";
 import { useThemeStore, refreshSeed, setCustomWallpaper, useDesktopWallpaper } from "../theme/useTheme";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
+import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import {
   TERM_OPACITY_MAX,
   TERM_OPACITY_MIN,
@@ -46,13 +49,16 @@ const KEYS: { keys: string[]; what: string }[] = [
   { keys: ["Ctrl", "↑ / ↓"], what: "Jump between commands" },
 ];
 
-type Page = "appearance" | "terminal" | "layout" | "keys";
+type Page = "appearance" | "terminal" | "layout" | "keys" | "updates";
+
+type UpdateState = "idle" | "checking" | "none" | "available" | "downloading" | "installed" | "error";
 
 const PAGES: { id: Page; label: string; icon: ReactNode }[] = [
   { id: "appearance", label: "Appearance", icon: <Palette size={15} /> },
   { id: "terminal", label: "Terminal", icon: <Terminal size={15} /> },
   { id: "layout", label: "Layout", icon: <LayoutGrid size={15} /> },
   { id: "keys", label: "Shortcuts", icon: <Keyboard size={15} /> },
+  { id: "updates", label: "Updates", icon: <RefreshCw size={15} /> },
 ];
 
 export function SettingsPanel({ panelKey }: { panelKey: string }) {
@@ -62,6 +68,10 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
   const wallpaper = useThemeStore((s) => s.wallpaper);
   const [page, setPage] = useState<Page>("appearance");
   const [logoMissing, setLogoMissing] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
+  const [updateState, setUpdateState] = useState<UpdateState>("idle");
+  const [updateInfo, setUpdateInfo] = useState<Update | null>(null);
+  const [updateError, setUpdateError] = useState("");
 
   useEffect(() => {
     const path = opts.sysfetchLogoPath;
@@ -77,6 +87,38 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
       current = false;
     };
   }, [opts.sysfetchLogoPath]);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
+
+  const handleCheckForUpdate = async () => {
+    if (updateState === "checking" || updateState === "downloading") return;
+    setUpdateState("checking");
+    setUpdateError("");
+    try {
+      const result = await checkForUpdate();
+      setUpdateInfo(result);
+      setUpdateState(result ? "available" : "none");
+    } catch (error) {
+      setUpdateError(String(error));
+      setUpdateState("error");
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!updateInfo || updateState === "downloading") return;
+    setUpdateState("downloading");
+    setUpdateError("");
+    try {
+      await updateInfo.downloadAndInstall();
+      setUpdateState("installed");
+      await relaunch();
+    } catch (error) {
+      setUpdateError(String(error));
+      setUpdateState("error");
+    }
+  };
 
   return (
     <div className="panel settings-panel">
@@ -319,6 +361,29 @@ export function SettingsPanel({ panelKey }: { panelKey: string }) {
               </SettingGroup>
             </SettingsPage>
           )}
+
+          {page === "updates" && (
+            <SettingsPage title="Updates" description="Check GitHub for a newer build and install it without leaving Tethys.">
+              <SettingGroup title="Version" description="Tethys checks GitHub Releases when you ask it to — never automatically in the background.">
+                <div className="set-list">
+                  <ActionRow
+                    label={`Tethys ${appVersion || "…"}`}
+                    note={updateNote(updateState, updateInfo, updateError)}
+                    action={
+                      updateState === "checking"
+                        ? "Checking…"
+                        : updateState === "downloading"
+                          ? "Installing…"
+                          : updateState === "available"
+                            ? "Install & Restart"
+                            : "Check for updates"
+                    }
+                    onClick={updateState === "available" ? handleInstallUpdate : handleCheckForUpdate}
+                  />
+                </div>
+              </SettingGroup>
+            </SettingsPage>
+          )}
         </div>
       </div>
     </div>
@@ -390,4 +455,24 @@ function sourceLabel(
 
 function fileName(path: string): string {
   return path.split(/[\\/]/).pop() || path;
+}
+
+function updateNote(state: UpdateState, info: Update | null, error: string): string {
+  switch (state) {
+    case "checking":
+      return "Checking for updates…";
+    case "none":
+      return "You're on the latest version.";
+    case "available":
+      return info ? `Version ${info.version} is available.` : "A new version is available.";
+    case "downloading":
+      return "Downloading and installing — Tethys will restart automatically.";
+    case "installed":
+      return "Installed. Restarting…";
+    case "error":
+      return `Update check failed: ${error}`;
+    case "idle":
+    default:
+      return "Press Check for updates to look for a newer build.";
+  }
 }
