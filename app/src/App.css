@@ -43,9 +43,7 @@ body {
   --head-h: 34px;
   --dock-h: 54px;
 
-  /* Bóng đổ tả độ cao, không tả màu (chỉ thị U1). `.settings-shell` gọi biến này từ trước
-     nhưng chưa nơi nào khai báo — biến không tồn tại làm hỏng *cả* khai báo `box-shadow`,
-     nên viền trong sáng của panel Cài đặt cũng mất theo. */
+  /* Bóng đổ tả độ cao, không tả màu (chỉ thị U1). */
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.16), 0 2px 6px rgb(0 0 0 / 0.18);
 
   --font-mono: "CaskaydiaCove Nerd Font", "Cascadia Mono", Consolas, monospace;
@@ -165,6 +163,7 @@ body {
 .app.effects-off .dock,
 .app.effects-off .panel.terminal-panel,
 .app.effects-off .palette-backdrop,
+.app.effects-off .settings-backdrop,
 .app.effects-off .ctx-menu {
   backdrop-filter: none;
 }
@@ -207,7 +206,7 @@ body {
 .brand-logo {
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   object-fit: cover;
   flex: none;
 }
@@ -763,161 +762,199 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   justify-content: center;
   touch-action: none;
 }
-/* ── Panel cài đặt ───────────────────────────────────────────────
-   Hai vùng rõ ràng: danh mục nhỏ ở trái, nội dung yên tĩnh ở phải. Mỗi lần chỉ hiện một
-   nhóm nên không còn cảm giác "form quản trị" dài đặc kín như bản cũ. */
+/* ── Settings — popup, không còn là panel trong tile ────────────────
+   Từng là một block trong lưới, tự lo responsive theo bề ngang panel và dồn chữ thành
+   những hàng "nhãn + ghi chú" dài phải đọc từng dòng. Popup thì kích thước cố định, không
+   ai kéo hẹp nó — nên bố cục dồn hết vào việc quét mắt: dải icon điều hướng bên trái,
+   lưới thẻ icon bên phải thay hàng chữ; giải thích dài lùi vào `title` (hover mới hiện). */
 
-.settings-shell {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 166px minmax(0, 1fr);
-  margin: 8px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 50%, transparent);
-  border-radius: var(--r-xl);
-  background: color-mix(in srgb, var(--ui-surface-container-low) 88%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-surface) 7%, transparent);
-}
-
-.settings-panel { container: settings / inline-size; }
-
-.set-sidebar {
-  min-width: 0;
-  margin: 6px;
-  padding: 15px 7px 9px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 26%, transparent);
-  border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--ui-surface-container-highest) 58%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-surface) 5%, transparent);
-}
-
-.set-sidebar-title { padding: 5px 11px 19px; display: flex; flex-direction: column; gap: 4px; }
-.set-sidebar-title > span { font-size: 13px; font-weight: 720; letter-spacing: -0.02em; color: var(--ui-on-surface); }
-.set-sidebar-title small { font-size: 10px; line-height: 1.35; color: var(--ui-on-surface-variant); opacity: 0.68; }
-
-.set-nav { display: flex; flex-direction: column; gap: 4px; }
-.set-nav button {
-  height: 40px;
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 11px;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ui-background) 55%, transparent);
+  backdrop-filter: blur(14px);
+  padding: 24px;
+}
+
+.settings-modal {
+  width: min(860px, 100%);
+  height: min(600px, 100%);
+  display: flex;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  background: var(--ui-surface-container-low);
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 50%, transparent);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.34);
+  animation: settings-modal-in 200ms var(--e-decelerate) both;
+}
+@keyframes settings-modal-in {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.set-rail {
+  flex: none;
+  width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 20px 0;
+  background: color-mix(in srgb, var(--ui-surface-container-highest) 62%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--ui-outline-variant) 30%, transparent);
+}
+.set-rail-logo { width: 34px; height: 34px; border-radius: var(--r-md); object-fit: cover; }
+.set-rail-nav { display: flex; flex-direction: column; gap: 8px; }
+.set-rail-nav button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--r-full);
   background: transparent;
   color: var(--ui-on-surface-variant);
-  font: inherit;
-  font-size: 12px;
   cursor: pointer;
-  transition: background 140ms var(--e-standard), color 140ms var(--e-standard), transform 180ms var(--e-decelerate);
+  transition: background 140ms var(--e-standard), color 140ms var(--e-standard), transform 160ms var(--e-decelerate);
 }
-.set-nav button:hover { background: color-mix(in srgb, var(--ui-on-surface) 7%, transparent); color: var(--ui-on-surface); }
-.set-nav button.on {
-  background: color-mix(in srgb, var(--ui-secondary-container) 88%, transparent);
-  color: var(--ui-on-secondary-container);
-  font-weight: 650;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-secondary-container) 18%, transparent);
+.set-rail-nav button:hover { background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent); color: var(--ui-on-surface); }
+.set-rail-nav button.on {
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ui-primary) 45%, transparent);
 }
-.set-nav button:active { transform: scale(0.97); }
+.set-rail-nav button:active { transform: scale(0.94); }
 
-.set-source {
-  margin-top: auto;
-  padding: 11px 12px;
+.set-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.set-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 26px 16px; }
+.set-head h2 { font-size: 21px; line-height: 1.15; letter-spacing: -0.03em; color: var(--ui-on-surface); font-weight: 720; }
+.set-head p { margin-top: 4px; color: var(--ui-on-surface-variant); font-size: 11.5px; }
+.set-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--ui-on-surface) 5%, transparent);
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ui-on-surface) 6%, transparent);
   color: var(--ui-on-surface-variant);
-  font-size: 10px;
+  cursor: pointer;
+  transition: background 130ms var(--e-standard), color 130ms var(--e-standard);
 }
-.source-dot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--ui-outline); }
+.set-close:hover { background: var(--ui-error-container); color: var(--ui-on-error-container); }
+
+.set-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 26px 26px; scrollbar-gutter: stable; }
+
+.set-group { margin-top: 22px; }
+.set-group:first-child { margin-top: 0; }
+.set-group-label {
+  margin: 0 2px 10px;
+  font-size: 10.5px;
+  font-weight: 680;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-on-surface-variant);
+  opacity: 0.75;
+}
+
+/* Lưới thẻ — trục chính của "nhìn hiểu nhanh hơn đọc". Icon lớn, nhãn ngắn; viền + nền
+   màu báo trạng thái "đang bật" thay vì phải đọc chữ On/Off. */
+.set-grid { display: grid; gap: 8px; }
+.set-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.set-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.set-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 84px;
+  padding: 14px 8px;
+  border: 1.5px solid color-mix(in srgb, var(--ui-outline-variant) 40%, transparent);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--ui-surface-container-high) 60%, transparent);
+  color: var(--ui-on-surface-variant);
+  font: inherit;
+  cursor: pointer;
+  transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 160ms var(--e-decelerate);
+}
+.set-card:hover { background: var(--ui-surface-container-highest); color: var(--ui-on-surface); }
+.set-card:active { transform: scale(0.97); }
+.set-card-icon { display: flex; }
+.set-card-label { font-size: 11px; font-weight: 560; text-align: center; line-height: 1.25; }
+.set-card.on { border-color: var(--ui-primary); background: var(--ui-primary-container); color: var(--ui-on-primary-container); }
+.set-card.on .set-card-label { font-weight: 680; }
+
+.set-status { margin-top: 10px; display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--ui-on-surface-variant); }
+.source-dot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--ui-outline); flex: none; }
 .source-dot.live { background: var(--ui-tertiary); }
 
-.set-content {
-  min-width: 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  background: color-mix(in srgb, var(--ui-surface-container-lowest) 26%, transparent);
-}
-.set-page {
-  width: min(100%, 760px);
-  margin: 0 auto;
-  padding: 34px clamp(20px, 4vw, 48px) 46px;
-  animation: settings-page-in 260ms var(--e-decelerate) both;
-}
-@keyframes settings-page-in {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: none; }
-}
-
-.set-page-head { margin: 0 5px 30px; }
-.set-page-head h2 { font-size: 27px; line-height: 1.12; letter-spacing: -0.045em; color: var(--ui-on-surface); font-weight: 720; }
-.set-page-head p { margin-top: 6px; color: var(--ui-on-surface-variant); font-size: 12px; line-height: 1.5; }
-
-.set-group { margin-top: 30px; }
-.set-group + .set-group { margin-top: 34px; }
-.set-group-head { margin: 0 7px 12px; }
-.set-group-head h3 { font-size: 12px; color: var(--ui-on-surface); font-weight: 680; }
-.set-group-head p { margin-top: 3px; color: var(--ui-on-surface-variant); font-size: 10.5px; line-height: 1.45; opacity: 0.72; }
-
-.set-list {
-  overflow: hidden;
-  padding: 4px;
-  border-radius: var(--r-xl);
-  background: color-mix(in srgb, var(--ui-surface-container-high) 76%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 42%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-surface) 7%, transparent);
-}
-.set-item {
-  min-height: 64px;
-  padding: 13px 17px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-radius: var(--r-lg);
-  color: var(--ui-on-surface);
-  transition: background 160ms var(--e-standard);
-}
-.set-item:hover { background: color-mix(in srgb, var(--ui-on-surface) 5%, transparent); }
-.set-item + .set-item,
-.set-item + .set-tip,
-.set-tip + .set-item { border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 17%, transparent); }
-.set-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.set-label { font-size: 12.5px; font-weight: 520; color: var(--ui-on-surface); }
-.set-copy small { font-size: 10.5px; color: var(--ui-on-surface-variant); line-height: 1.4; opacity: 0.7; }
-
-.set-choice { align-items: flex-start; flex-direction: column; gap: 11px; padding-top: 16px; padding-bottom: 16px; }
-.set-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.set-chip,
-.set-btn {
-  min-height: 32px;
+.set-chips { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; }
+.set-chip {
+  min-height: 30px;
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 46%, transparent);
   background: color-mix(in srgb, var(--ui-surface-container-lowest) 46%, transparent);
   color: var(--ui-on-surface-variant);
   border-radius: var(--r-full);
-  padding: 6px 13px;
+  padding: 5px 12px;
   font: inherit;
   font-size: 10.5px;
   cursor: pointer;
   transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 180ms var(--e-decelerate);
 }
-.set-chip:hover, .set-btn:hover { background: var(--ui-surface-container-highest); color: var(--ui-on-surface); border-color: transparent; }
-.set-chip:active, .set-btn:active { transform: scale(0.96); }
-.set-chip.on { background: var(--ui-primary-container); border-color: transparent; color: var(--ui-on-primary-container); font-weight: 680; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-on-primary-container) 16%, transparent); }
+.set-chip:hover { background: var(--ui-surface-container-highest); color: var(--ui-on-surface); border-color: transparent; }
+.set-chip:active { transform: scale(0.96); }
+.set-chip.on { background: var(--ui-primary-container); border-color: transparent; color: var(--ui-on-primary-container); font-weight: 680; }
 
-.set-slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 16px; padding-top: 11px; padding-bottom: 11px; }
-.set-slider input[type="range"] { grid-column: 1 / -1; width: 100%; height: 16px; margin: 0; accent-color: var(--ui-primary); background: transparent; }
-/* Thanh trượt bị chế độ khác chiếm quyền: vẫn đọc được giá trị đang có hiệu lực, nhưng
-   nói rõ bằng mắt rằng kéo cũng không ăn thua — dòng `note` bên dưới nói lý do. */
+/* Hàng thao tác / trượt — vẫn cần đọc (giá trị số, ghi chú động như tên file đang chọn),
+   nên giữ dạng hàng thay vì ép vào lưới thẻ; icon đầu hàng vẫn cho mắt quét trước khi đọc. */
+.set-item { min-height: 60px; padding: 12px 4px; display: flex; align-items: center; gap: 13px; color: var(--ui-on-surface); }
+.set-item + .set-item { border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 17%, transparent); }
+.set-item-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--ui-on-surface) 6%, transparent);
+  color: var(--ui-on-surface-variant);
+}
+.set-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.set-label { font-size: 12px; font-weight: 560; color: var(--ui-on-surface); }
+.set-copy small { font-size: 10.5px; color: var(--ui-on-surface-variant); line-height: 1.4; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-btn {
+  flex: none;
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 46%, transparent);
+  background: color-mix(in srgb, var(--ui-surface-container-lowest) 46%, transparent);
+  color: var(--ui-on-surface-variant);
+  border-radius: var(--r-full);
+  padding: 5px 13px;
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 180ms var(--e-decelerate);
+}
+.set-btn:hover { background: var(--ui-primary-container); color: var(--ui-on-primary-container); border-color: transparent; }
+.set-btn:active { transform: scale(0.96); }
+
+.set-slider { align-items: center; flex-wrap: wrap; }
+.set-slider input[type="range"] { flex-basis: 100%; width: 100%; height: 16px; margin: 0; accent-color: var(--ui-primary); background: transparent; }
 .set-slider.off { opacity: 0.55; }
 .set-slider.off input[type="range"] { cursor: not-allowed; }
 .set-val {
-  align-self: center;
+  flex: none;
   min-width: 44px;
   padding: 4px 8px;
   border-radius: var(--r-full);
@@ -929,38 +966,22 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   white-space: nowrap;
 }
 
-.set-switch { position: relative; width: 42px; height: 24px; flex: none; }
-.set-switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.set-switch-track {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--r-full);
-  background: var(--ui-surface-container-highest);
-  border: 1px solid var(--ui-outline);
-  pointer-events: none;
-  transition: background 180ms var(--e-standard), border-color 180ms var(--e-standard);
-}
-.set-switch-track > span {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  left: 3px;
-  top: 3px;
-  border-radius: var(--r-full);
-  background: var(--ui-outline);
-  transition: transform 220ms var(--e-decelerate), background 180ms var(--e-standard);
-}
-.set-switch input:checked + .set-switch-track { background: var(--ui-primary); border-color: var(--ui-primary); }
-.set-switch input:checked + .set-switch-track > span { transform: translateX(18px); background: var(--ui-on-primary); }
-.set-switch input:focus-visible + .set-switch-track { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.set-tip { margin-top: 12px; padding: 12px 14px; border-radius: var(--r-lg); color: var(--ui-on-surface-variant); font-size: 10.5px; line-height: 1.55; background: color-mix(in srgb, var(--ui-tertiary-container) 28%, transparent); }
 
-.set-tip { padding: 13px 16px; border-radius: var(--r-lg); color: var(--ui-on-surface-variant); font-size: 10.5px; line-height: 1.55; background: color-mix(in srgb, var(--ui-tertiary-container) 28%, transparent); }
-.set-keylist { display: flex; flex-direction: column; }
-.set-key { min-height: 40px; padding: 7px 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.set-key + .set-key { border-top: 1px solid color-mix(in srgb, var(--ui-outline-variant) 22%, transparent); }
-.set-key-what { min-width: 0; color: var(--ui-on-surface-variant); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-keylist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
+.set-key {
+  min-height: 38px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--ui-surface-container-high) 46%, transparent);
+}
+.set-key-what { min-width: 0; color: var(--ui-on-surface-variant); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-key-combo { display: flex; gap: 3px; justify-content: flex-end; flex: none; }
-.settings-shell kbd {
+.settings-modal kbd {
   font-family: var(--font-mono);
   font-size: 9.5px;
   padding: 3px 6px;
@@ -970,15 +991,9 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   white-space: nowrap;
 }
 
-@container settings (max-width: 540px) {
-  .settings-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .set-sidebar { margin: 4px; padding: 5px; flex-direction: row; }
-  .set-sidebar-title, .set-source, .set-nav button span { display: none; }
-  .set-nav { width: 100%; flex-direction: row; gap: 3px; }
-  .set-nav button { height: 34px; flex: 1; justify-content: center; padding: 0; }
-  .set-page { padding: 22px 12px 34px; }
-  .set-page-head { margin-bottom: 22px; }
-  .set-page-head h2 { font-size: 23px; }
+@media (max-width: 620px) {
+  .set-keylist { grid-template-columns: minmax(0, 1fr); }
+  .set-grid.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .gutter.row { cursor: col-resize; }
@@ -1212,11 +1227,10 @@ body.dragging-panel * {
   user-select: none;
 }
 
-/* Fullscreen is for the workspace itself: F11 and Alt+Enter keep working in the terminal,
-   while chrome steps out of the way until the same shortcut is pressed again. */
-.app.is-fullscreen .titlebar,
-.app.is-fullscreen .dock-wrap { display: none; }
-.app.is-fullscreen .canvas { padding-bottom: var(--gap); }
+/* Fullscreen is for the workspace itself: F11 and Alt+Enter keep working in the terminal.
+   Chrome doesn't vanish outright — `.app.tsx` forces the `nav-auto`/`dock-auto` classes
+   while fullscreen, same tuck-away-and-reveal-on-hover behavior as the manual toggle,
+   just without needing the setting on. */
 
 /* Ô đặc, mỗi ô một màu — đây là nét nhận dạng của dock trong ảnh tham chiếu.
    Tô nhạt rồi mới đặc khi rê chuột thì dock trông xám xịt, mất hẳn cái vui đó. */
@@ -1762,6 +1776,12 @@ body.dragging-panel * {
 }
 .ex-row.dir .ex-icon { color: var(--ui-on-secondary-container); background: var(--ui-secondary-container); }
 .ex-row.dir .ex-name { color: var(--ui-on-surface); font-weight: 500; }
+/* File thì icon đã tự mang màu/kiểu riêng (react-file-icon) — nhét thêm khối màu nền
+   phía sau chỉ làm rối mắt, khác hẳn icon thư mục đơn sắc ở trên cần nền để nổi bật. */
+.ex-row:not(.dir) .ex-icon { background: transparent; padding: 3px; }
+.ex-row:not(.dir) .ex-icon svg { width: 100%; height: 100%; }
+.ex-icon.thumb { padding: 0; overflow: hidden; }
+.ex-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ex-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ex-meta {
   flex: none;
@@ -2177,6 +2197,7 @@ body.dragging-panel * {
 .app.surface-flat .dock,
 .app.surface-flat .ctx-menu,
 .app.surface-flat .palette-backdrop,
+.app.surface-flat .settings-backdrop,
 .app.surface-flat .panel.terminal-panel {
   backdrop-filter: none;
 }
@@ -2203,13 +2224,16 @@ body.dragging-panel * {
   box-shadow: var(--shadow-1);
 }
 
-/* Bảng lệnh vẫn phải làm chìm thứ phía sau, nhưng bằng độ đục chứ không bằng blur. */
-.app.surface-flat .palette-backdrop {
+/* Bảng lệnh và popup cài đặt vẫn phải làm chìm thứ phía sau, nhưng bằng độ đục chứ
+   không bằng blur. */
+.app.surface-flat .palette-backdrop,
+.app.surface-flat .settings-backdrop {
   background: color-mix(in srgb, var(--ui-background) 82%, transparent);
 }
 
-.app.surface-flat .settings-shell {
+.app.surface-flat .settings-modal {
   background: var(--ui-surface-container-low);
+  border-color: var(--ui-outline-variant);
   box-shadow: none;
 }
 

@@ -183,3 +183,81 @@ pub fn fs_list_dir(path: Option<String>) -> Result<DirListing, String> {
 pub fn fs_cwd() -> String {
     std::env::current_dir().map(|p| clean(&p)).unwrap_or_default()
 }
+
+#[derive(Debug, Serialize)]
+pub struct DriveInfo {
+    /// Gốc ổ đĩa dạng `"D:\\"` — dùng thẳng được cho `fs_list_dir`.
+    pub letter: String,
+    /// Tên volume (vd. "Windows", "Data"). Rỗng nếu ổ chưa đặt tên hoặc không đọc được
+    /// (ổ CD-ROM trống, ổ mạng ngắt kết nối...).
+    pub label: String,
+    /// "fixed" | "removable" | "network" | "cdrom" | "ramdisk" | "unknown".
+    pub kind: String,
+}
+
+/// Liệt kê các ổ đĩa đang gắn — nguồn cho dropdown chọn ổ trong Explorer.
+///
+/// `GetLogicalDrives` trả về bitmask 26 bit (bit 0 = A:), đúng API Windows dùng để liệt kê ổ;
+/// không dò tay từng chữ cái bằng `fs::metadata` vì cách đó chậm và trả sai loại ổ.
+#[tauri::command]
+pub fn fs_list_drives() -> Vec<DriveInfo> {
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW,
+    };
+    use windows_sys::Win32::System::WindowsProgramming::{
+        DRIVE_CDROM, DRIVE_FIXED, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
+    };
+
+    let mask = unsafe { GetLogicalDrives() };
+    let mut drives = Vec::new();
+
+    for i in 0..26u32 {
+        if mask & (1 << i) == 0 {
+            continue;
+        }
+        let letter = (b'A' + i as u8) as char;
+        let root: Vec<u16> = format!("{letter}:\\")
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let kind = match unsafe { GetDriveTypeW(root.as_ptr()) } {
+            DRIVE_FIXED => "fixed",
+            DRIVE_REMOVABLE => "removable",
+            DRIVE_REMOTE => "network",
+            DRIVE_CDROM => "cdrom",
+            DRIVE_RAMDISK => "ramdisk",
+            _ => "unknown",
+        };
+
+        // Ổ CD-ROM trống hay ổ mạng vừa ngắt kết nối làm hàm này fail — không phải lỗi,
+        // chỉ đơn giản là không có tên volume để hiện.
+        let mut name_buf = [0u16; 128];
+        let ok = unsafe {
+            GetVolumeInformationW(
+                root.as_ptr(),
+                name_buf.as_mut_ptr(),
+                name_buf.len() as u32,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        let label = if ok != 0 {
+            let len = name_buf.iter().position(|&c| c == 0).unwrap_or(0);
+            String::from_utf16_lossy(&name_buf[..len])
+        } else {
+            String::new()
+        };
+
+        drives.push(DriveInfo {
+            letter: format!("{letter}:\\"),
+            label,
+            kind: kind.to_string(),
+        });
+    }
+
+    drives
+}

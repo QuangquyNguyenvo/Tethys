@@ -99,8 +99,25 @@ impl PtySession {
             // Phải tự kiểm cú pháp trước khi phát: Enter giữa một khối chưa đóng ngoặc là
             // xuống dòng chứ không phải chạy lệnh, phát C ở đó thì panel kẹt "đang chạy"
             // vĩnh viễn vì chẳng bao giờ có D tương ứng.
-            let script = String::from(
+            let mut script = String::from(
                 r#"$global:__prompt_orig = $function:prompt; function prompt { $exit = $LASTEXITCODE; $e = [char]27; $cwd = $executionContext.SessionState.Path.CurrentLocation.Path; Write-Host -NoNewline "$e]133;D;$exit`a$e]7;file:///$($cwd.Replace([char]92,'/'))`a$e]133;A`a"; $p = if ($global:__prompt_orig) { & $global:__prompt_orig } else { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }; Write-Host -NoNewline "$e]133;B`a"; return $p }; try { Set-PSReadLineKeyHandler -Chord Enter -ScriptBlock { $l = $null; $c = $null; [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$l, [ref]$c); [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine(); if ($l -and $l.Trim()) { $errs = $null; [void][System.Management.Automation.Language.Parser]::ParseInput($l, [ref]$null, [ref]$errs); if (-not ($errs | Where-Object { $_.IncompleteInput })) { $e = [char]27; $one = $l.Replace([char]13, ' ').Replace([char]10, ' '); [Console]::Write("$e]133;C;$one`a") } } } } catch {}"#,
+            );
+            // Windows PowerShell 5.1 (rơi về khi không có `pwsh` trên PATH) không có `$PSStyle`
+            // — tính năng của PowerShell 7.2+ — nên `Get-ChildItem`/`dir`/`ls` ra chữ trắng
+            // trơn, không một mã ANSI nào.
+            //
+            // Đã thử đè hàm `Out-Default` trước và phải bỏ: engine echo kết quả một statement
+            // top-level (gõ `ls` rồi Enter, không gán biến, không pipe tiếp) không đi qua tra
+            // cứu lệnh theo tên — nó gọi thẳng `OutDefaultCommand` nội bộ, nên hàm cùng tên
+            // không chặn được đường đó (đã đo: hàm chỉ chạy khi *tự tay* pipe vào `Out-Default`).
+            //
+            // Đổi hướng: đè alias `ls`/`dir` sang một hàm tự in màu. Hàm soi
+            // `$MyInvocation.PipelinePosition` so với `PipelineLength` — đứng cuối pipeline
+            // (gõ trần, không pipe tiếp) mới tô màu rồi in; còn bị pipe tiếp
+            // (`ls | Where-Object …`) thì trả nguyên object `FileInfo`/`DirectoryInfo`, không
+            // đụng gì — script khác gọi `dir`/`ls` để lọc/pipe không bị vỡ.
+            script.push_str(
+                r#"; if (-not $PSStyle) { function global:Show-ColorDir { $items = Get-ChildItem @args; $isTerminal = $MyInvocation.PipelinePosition -ge $MyInvocation.PipelineLength; if (-not $isTerminal) { return $items }; $e = [char]27; foreach ($i in $items) { $n = $i.Name; if ($i.PSIsContainer) { Write-Host "$e[1;34m$n$e[0m" } elseif ($i.Extension -match '\.(exe|bat|cmd|ps1|psm1)$') { Write-Host "$e[1;32m$n$e[0m" } elseif ($i.Extension -match '\.(zip|7z|rar|gz|tar)$') { Write-Host "$e[1;31m$n$e[0m" } else { Write-Host $n } } }; Set-Alias -Name ls -Value Show-ColorDir -Scope Global -Option AllScope -Force; Set-Alias -Name dir -Value Show-ColorDir -Scope Global -Option AllScope -Force }"#,
             );
             // `NONAME_BOOT_CMD` được `pty_spawn` gửi sau khi frontend đã đăng ký Channel.
             // Không chạy ở đây: chạy cả hai đường sẽ nhân đôi workload benchmark và có thể

@@ -59,12 +59,13 @@ const ICON = 12;
 /**
  * Thanh tiêu đề dùng chung cho mọi loại panel.
  *
- * Hai điều nó phải giữ được, và là lý do nó tồn tại thay vì mỗi panel tự viết:
+ * Điều hướng block (trước/sau) và chia dọc/ngang đều đã có phím tắt riêng
+ * (Ctrl+Shift+Tab, Ctrl+Shift+E, Ctrl+Shift+O), nên luôn nằm trong menu `…` chứ không
+ * choán chỗ trên thanh — thanh chỉ hiện đúng thao tác mà panel tự khai `inline: true`,
+ * tức là thao tác không có đường tắt nào khác (ví dụ toggle xem raw/rendered ở Preview).
  *
- * 1. **Chia dọc / chia ngang nằm ngay góc trên của block.** Trước kia chúng nấp trong một
- *    menu xổ xuống, mà cùng lúc lại có thêm hai nút y hệt dưới dock — hai chỗ, cùng một việc.
- * 2. **Hẹp lại thì gom, không mất.** Panel co nhỏ thì nút dồn vào menu tràn `⋯`; bản cũ
- *    để chúng bị đẩy tràn ra ngoài `overflow:hidden` và biến mất không dấu vết.
+ * Panel co nhỏ thì nút dồn vào menu tràn `⋯`; bản cũ để chúng bị đẩy tràn ra ngoài
+ * `overflow:hidden` và biến mất không dấu vết.
  */
 export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, actions = [] }: Props) {
   const { ref, width } = usePanelWidth<HTMLDivElement>();
@@ -158,19 +159,14 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
 
   const wantsInline = actions.filter((a) => a.inline);
   const wantsMenu = actions.filter((a) => !a.inline);
-  // Terminal là nơi mắt đọc liên tục. Giữ header của nó giống một tab mảnh; các thao tác
-  // bố cục vẫn còn nguyên nhưng nằm trong menu `…` để không biến thành một toolbar dày.
-  const quietTerminalHeader = kind === "term";
   const all = [...wantsInline, ...wantsMenu, ...navigationActions, ...splitActions];
   // Hẹp tới mức này thì nút đóng cũng vào menu — thà bấm hai lần còn hơn không bấm được.
   const overflow = inlineActions
-    ? quietTerminalHeader
-      ? [...wantsMenu, ...navigationActions, ...splitActions]
-      : wantsMenu
+    ? [...wantsMenu, ...navigationActions, ...splitActions]
     : minimal
       ? [...all, closeAction]
       : all;
-  const shown = inlineActions && !quietTerminalHeader ? [...wantsInline, ...splitActions] : [];
+  const shown = inlineActions ? wantsInline : [];
 
   return (
     <div
@@ -219,13 +215,6 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
             <GripVertical size={14} />
           </button>
         )}
-
-        {inlineActions &&
-          navigationActions.map((a) => (
-            <button key={a.id} className="iconbtn block-nav" title={a.label} aria-label={a.label} onClick={a.onClick}>
-              {a.icon}
-            </button>
-          ))}
 
         {shown.map((a) => (
           <button

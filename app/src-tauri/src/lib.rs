@@ -5,6 +5,7 @@ mod storage;
 mod system;
 mod wallpaper;
 mod watcher;
+mod window_cmd;
 
 use pty::session::SessionId;
 use pty::PtyManager;
@@ -132,38 +133,6 @@ fn pty_alive(mgr: State<'_, PtyManager>, session_id: SessionId) -> bool {
 }
 
 #[tauri::command]
-fn app_window_minimize(window: tauri::Window) {
-    let _ = window.minimize();
-}
-
-#[tauri::command]
-fn app_window_toggle_maximize(window: tauri::Window) {
-    if let Ok(is_max) = window.is_maximized() {
-        if is_max {
-            let _ = window.unmaximize();
-        } else {
-            let _ = window.maximize();
-        }
-    } else {
-        let _ = window.maximize();
-    }
-}
-
-#[tauri::command]
-fn app_window_close(window: tauri::Window) {
-    let _ = window.close();
-}
-
-#[tauri::command]
-fn app_window_toggle_fullscreen(window: tauri::Window) -> Result<bool, String> {
-    let next = !window.is_fullscreen().map_err(|error| error.to_string())?;
-    window
-        .set_fullscreen(next)
-        .map_err(|error| error.to_string())?;
-    Ok(next)
-}
-
-#[tauri::command]
 fn app_window_set_vibrancy(window: tauri::Window, enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -186,6 +155,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(PtyManager::default())
         .manage(WatcherManager::default())
+        .manage(window_cmd::WindowState::default())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -240,14 +210,17 @@ pub fn run() {
             fs_cmd::fs_resolve_path,
             fs_cmd::fs_list_dir,
             fs_cmd::fs_cwd,
+            fs_cmd::fs_list_drives,
             watcher::watch_file,
             watcher::unwatch_file,
             storage::storage_save_state,
             storage::storage_load_state,
-            app_window_minimize,
-            app_window_toggle_maximize,
-            app_window_close,
-            app_window_toggle_fullscreen,
+            window_cmd::app_window_minimize,
+            window_cmd::app_window_toggle_maximize,
+            window_cmd::app_window_is_maximized,
+            window_cmd::app_window_close,
+            window_cmd::app_window_toggle_fullscreen,
+            window_cmd::app_window_system_menu,
             app_window_set_vibrancy
         ])
         .run(tauri::generate_context!())

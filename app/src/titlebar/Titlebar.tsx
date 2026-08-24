@@ -109,17 +109,31 @@ export function Titlebar({
     });
   };
 
+  /** true nếu click rơi vào chrome trống (không phải tab/nút) — chỗ hợp lệ để kéo/maximize. */
+  const isChromeTarget = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    return !target.closest(
+      "button, input, [role='tab'], .tab-item, .window-controls, .tab-add, .tab-close, .win-btn"
+    );
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (
-      target.closest(
-        "button, input, [role='tab'], .tab-item, .window-controls, .tab-add, .tab-close, .win-btn"
-      )
-    ) {
-      return;
-    }
+    if (!isChromeTarget(e)) return;
     appWindow?.startDragging().catch(() => {});
+  };
+
+  // Double-click bubbling từ một tab lên `.titlebar-center` từng bị hiểu nhầm là double-click
+  // vào chrome trống, nên bấm nhanh hai lần vào workspace tab lại vô tình toggle maximize.
+  const handleChromeDoubleClick = (e: React.MouseEvent) => {
+    if (!isChromeTarget(e)) return;
+    handleMaximize(e);
+  };
+
+  const handleSystemMenu = (e: React.MouseEvent) => {
+    if (!isChromeTarget(e)) return;
+    e.preventDefault();
+    invoke("app_window_system_menu").catch(() => {});
   };
 
   return (
@@ -127,7 +141,8 @@ export function Titlebar({
       className="titlebar"
       data-tauri-drag-region
       onMouseDown={handleMouseDown}
-      onDoubleClick={handleMaximize}
+      onDoubleClick={handleChromeDoubleClick}
+      onContextMenu={handleSystemMenu}
     >
       {/* Thanh thật là `.tb-bar`, một hòn đảo bo tròn nổi trên ảnh nền — `header` chỉ còn
           là dải lề quanh nó, và vẫn là vùng kéo cửa sổ để phần lề không thành chỗ chết. */}
@@ -141,7 +156,11 @@ export function Titlebar({
 
         {/* Vùng kéo nằm ở chính khối này, nên khoảng trống hai bên cụm tab vẫn kéo được
             cửa sổ; các nút bên trong là target khác nên không dính. */}
-        <div className="titlebar-center" data-tauri-drag-region onDoubleClick={handleMaximize}>
+        <div
+          className="titlebar-center"
+          data-tauri-drag-region
+          onDoubleClick={handleChromeDoubleClick}
+        >
           <div className="tab-bar" role="tablist" data-tauri-drag-region>
             {tabs.map((t, idx) => {
               const Icon = icons[idx];

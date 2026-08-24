@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -11,6 +11,9 @@ import type { CommandItem } from "./palette/commands";
 import { Titlebar } from "./titlebar/Titlebar";
 import { Dock, type DockItem } from "./dock/Dock";
 import { Folder, Globe, MonitorCog, Settings, Terminal } from "lucide-react";
+
+// Popup phụ trợ, không phải màn hình mặc định — nạp khi cần giống mọi panel khác trong Tiles.
+const SettingsModal = lazy(() => import("./settings/SettingsModal").then(({ SettingsModal }) => ({ default: SettingsModal })));
 import "./App.css";
 
 export default function App() {
@@ -35,6 +38,7 @@ export default function App() {
   const addWorkspace = useSessions((s) => s.addWorkspace);
   const removeWorkspace = useSessions((s) => s.removeWorkspace);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const toggleFullscreen = useCallback(() => {
@@ -53,11 +57,14 @@ export default function App() {
   // `setHydrated` phải chạy ở **mọi** nhánh — `Tiles` không dựng panel nào trước đó,
   // để tránh spawn một shell rồi vứt đi ngay khi state đã lưu ghi đè lên panel mặc định.
   useEffect(() => {
-    // Browser preview không có Tauri/ConPTY. Dựng thẳng panel Settings để designer vẫn
-    // kiểm được toàn bộ chrome thay vì React tree sập lúc TerminalPanel tạo IPC Channel.
+    // Browser preview không có Tauri/ConPTY. TerminalPanel tạo IPC Channel thật nên sập
+    // cả React tree; Explorer thì gọi `invoke` bọc try/catch nên chỉ tự hiện lỗi, an toàn
+    // để designer soi chrome. Settings giờ là popup, không còn là panel — mở nó song song
+    // là cách designer vẫn kiểm được toàn bộ chrome của nó.
     if (!("__TAURI_INTERNALS__" in window)) {
       const key = "preview-settings";
-      restore({ kind: "leaf", key }, [{ key, type: "settings" }], key);
+      restore({ kind: "leaf", key }, [{ key, type: "explorer" }], key);
+      setSettingsOpen(true);
       setHydrated();
       return;
     }
@@ -129,7 +136,13 @@ export default function App() {
           }
         })
         .catch(() => {})
-        .finally(() => setHydrated());
+        .finally(() => {
+          setHydrated();
+          // Settings từng là một panel trong tile — state cũ lưu từ trước có thể còn giữ
+          // một cái. Giờ nó là popup, nên dọn nốt panel loại đó ra khỏi workspace đang mở.
+          const s = useSessions.getState();
+          s.panels.filter((p) => p.type === "settings").forEach((p) => s.remove(p.key));
+        });
     });
   }, [split, openPreview, restore, setOpts, setHydrated]);
 
@@ -212,7 +225,7 @@ export default function App() {
     else s.createPanel({ type });
   }, []);
 
-  const openSettings = useCallback(() => openOnce("settings"), [openOnce]);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
   const openSystem = useCallback(() => openOnce("system"), [openOnce]);
 
   // Phím tắt toàn cục: Command Palette và Layout navigation
@@ -679,8 +692,11 @@ export default function App() {
       className={
         "app" +
         (isFullscreen ? " is-fullscreen" : "") +
-        (opts.dockAutoHide ? " dock-auto" : "") +
-        (opts.navAutoHide ? " nav-auto" : "") +
+        // Fullscreen thật (Alt+Enter/F11) không còn viền cửa sổ để bám vào — ép luôn kiểu
+        // tự-ẩn-rê-chuột-hiện-lại cho titlebar/dock bất kể cài đặt thường, chứ không
+        // `display: none` khiến chúng biến mất hẳn không cách nào gọi lại.
+        ((opts.dockAutoHide || isFullscreen) ? " dock-auto" : "") +
+        ((opts.navAutoHide || isFullscreen) ? " nav-auto" : "") +
         (opts.blurEffects === false ? " effects-off" : "") +
         // Bề mặt phẳng là một lớp override cuối `App.css`, không phải một bộ CSS thứ hai:
         // nó chỉ tắt blur, bóng và độ trong, còn hình khối vẫn của bản gốc.
@@ -711,13 +727,19 @@ export default function App() {
         <Tiles theme={xterm} />
       </main>
 
-      <Dock items={dockItems} autoHide={opts.dockAutoHide} />
+      <Dock items={dockItems} autoHide={opts.dockAutoHide || isFullscreen} />
 
       <CommandPalette
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         commands={commands}
       />
+
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsModal onClose={() => setSettingsOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Nói thẳng khi màu đang chạy dự phòng, thay vì để người dùng đoán vì sao xấu. */}
       {source === "fallback" && opts.colorSource === "wallpaper" && (

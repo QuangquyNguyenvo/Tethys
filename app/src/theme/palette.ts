@@ -139,7 +139,7 @@ export const DEFAULTS: ThemeOptions = {
   // gần như đen (đo được: luma 13,9). Ở 85% thì 15% ảnh nền lọt qua chỉ nâng luma lên ~17,
   // tức là *có* trong suốt nhưng không ai nhìn ra. 0,6 mới thấy được ảnh nền.
   termOpacity: 0.6,
-  dockAutoHide: false,
+  dockAutoHide: true,
   navAutoHide: true,
   windowVibrancy: true,
   blurEffects: true,
@@ -360,7 +360,7 @@ export function terminalVars(s: DynamicScheme, o: ThemeOptions): Record<string, 
   // giữ nó chạy khi chẳng thấy gì bên dưới là phí không (§7.7 điểm 3).
   // Bề mặt phẳng nghĩa là *đặc*, không có ngoại lệ: một terminal trong suốt giữa dàn panel
   // đục sẽ tố cáo ngay rằng "phẳng" chỉ là lớp sơn. Thanh Độ đục vì thế bị vô hiệu hoá ở
-  // chế độ này (xem `SettingsPanel`) thay vì im lặng không có tác dụng.
+  // chế độ này (xem `SettingsModal`) thay vì im lặng không có tác dụng.
   const opacity =
     o.surfaceStyle === "flat"
       ? TERM_OPACITY_MAX

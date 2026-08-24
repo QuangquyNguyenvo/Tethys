@@ -18,7 +18,6 @@ import { Folder, Plus, Terminal } from "lucide-react";
 const PreviewPanel = lazy(() => import("../preview/PreviewPanel").then(({ PreviewPanel }) => ({ default: PreviewPanel })));
 const ExplorerPanel = lazy(() => import("../explorer/ExplorerPanel").then(({ ExplorerPanel }) => ({ default: ExplorerPanel })));
 const WebPanel = lazy(() => import("../web/WebPanel").then(({ WebPanel }) => ({ default: WebPanel })));
-const SettingsPanel = lazy(() => import("../settings/SettingsPanel").then(({ SettingsPanel }) => ({ default: SettingsPanel })));
 const SystemPanel = lazy(() => import("../system/SystemPanel").then(({ SystemPanel }) => ({ default: SystemPanel })));
 
 type Props = { theme?: ITheme };
@@ -287,7 +286,10 @@ function PanelHost({
           ) : panel.type === "web" ? (
             <WebPanel panelKey={panel.key} url={panel.url} />
           ) : panel.type === "settings" ? (
-            <SettingsPanel panelKey={panel.key} />
+            // Settings là popup từ giờ, không còn dựng trong tile — state cũ lưu từ trước
+            // được dọn lúc hydrate (`App.tsx`); nhánh này chỉ là lưới an toàn, không nên
+            // bao giờ chạy tới trong thực tế.
+            null
           ) : panel.type === "system" ? (
             <SystemPanel panelKey={panel.key} visible={visible} />
           ) : (

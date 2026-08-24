@@ -27,7 +27,7 @@ phase 3 và cần version đã đổi nhất quán).
 | 1 | phase-01-updater-backend | 🟠 | — | ✅ |
 | 2 | phase-02-updater-ui | 🟢 | 1 | ✅ |
 | 3 | phase-03-release-workflow | 🟠 | 1 | ✅ |
-| 4 | phase-04-ship-v0-0-1 | 🔴 | 1, 2, 3 | ⬜ — chờ user xác nhận ở GATE trước khi push/tag |
+| 4 | phase-04-ship-v0-0-1 | 🔴 | 1, 2, 3 | ✅ |
 
 ⬜ chưa làm · 🟡 đang làm · ✅ xong & verify · ⚠️ xong nhưng có deviation
 
@@ -46,6 +46,7 @@ phase 3 và cần version đã đổi nhất quán).
 |---|---|---|---|
 | 2026-08-24 | khảo sát + viết plan | Claude (Sonnet 5) | Đọc code thật tại `3e25248`, sinh keypair minisign (lưu ngoài repo), viết CONTEXT + CHECKLIST + 4 phase. Chưa thực thi phase nào. |
 | 2026-08-24 | 1, 2, 3 | Claude (Sonnet 5) | Thực thi ngay trong cùng phiên (không tách session khác). Phase 1: `cargo check` xanh (117 crate, pattern `.setup()` cho updater compile đúng ngay lần đầu — xoá nghi vấn đã ghi trong plan). Phase 2: `tsc --noEmit` sạch. Phase 3: YAML hợp lệ, `gh secret list` xác nhận 2 secret đã set. Dừng lại đúng GATE của phase 4, chưa push/tag/tạo release — đang chờ user xác nhận. |
+| 2026-08-24 | 4 | Claude (Sonnet 5) | User xác nhận "Có, làm ngay" qua AskUserQuestion. Phát hiện `app/src-tauri/src/pty/session.rs` có thay đổi chưa commit KHÔNG liên quan (việc dở dang của user, thêm màu ls/dir cho PowerShell 5.1) — loại khỏi commit, không đụng vào. Bump version 3 file → `0.0.1`, build local có ký thành công (`.sig` sinh đúng cho cả NSIS+MSI). Commit `4324ded`, push `origin/main` OK. Tag `v0.0.1` push OK → workflow `32702272236` chạy **success**. Release `v0.0.1` live, `isDraft:false`, `isPrerelease:false`, đủ 5 asset (`latest.json`, 2 installer, 2 `.sig`). Endpoint `/releases/latest/download/latest.json` verify bằng `curl -IL` → 302 resolve đúng về `v0.0.1/latest.json`. **Plan hoàn thành 100%**, chỉ còn mục ⛔ MANUAL (cài thử trên máy thật) và việc ngoài phạm vi (test auto-update thật ở lần release kế). |
 
 ## Deviations tổng hợp
 

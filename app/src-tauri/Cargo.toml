@@ -34,9 +34,12 @@ notify = "6"
 window-vibrancy = "0.8.0"
 windows = { version = "0.61", features = [
   "Media_Control",
+  "Win32_Graphics_Gdi",
   "Win32_Media_Audio",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
@@ -48,5 +51,6 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_Ioctl",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
+  "Win32_System_WindowsProgramming",
 ] }
 rfd = "0.15"

@@ -1,24 +1,51 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useSessions } from "../store/sessions";
 import { PanelHeader, type HeadAction } from "../panel/PanelHeader";
 import { usePanelWidth } from "../panel/usePanelWidth";
+import { FileIcon, defaultStyles, type FileIconProps } from "react-file-icon";
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   Check,
   Columns2,
   Copy,
+  Disc,
   ExternalLink,
   Eye,
-  File,
   Folder,
   FolderOpen,
+  HardDrive,
+  MemoryStick,
+  Network,
   Pencil,
   RotateCw,
   Rows2,
   TerminalSquare,
+  Usb,
 } from "lucide-react";
 import { ContextMenu, useContextMenu, type MenuItem } from "../ui/ContextMenu";
+
+/** Đuôi ổ ứng với icon lucide — ổ cố định dùng thẳng `HardDrive` nên không cần liệt kê ở đây. */
+const DRIVE_ICONS: Record<string, ReactNode> = {
+  removable: <Usb size={13} />,
+  network: <Network size={13} />,
+  cdrom: <Disc size={13} />,
+  ramdisk: <MemoryStick size={13} />,
+};
+
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "svg", "avif"]);
+
+/** Đuôi file viết thường, không kèm dấu chấm. Không có đuôi (hoặc file ẩn kiểu ".gitignore") trả rỗng. */
+function extOf(name: string): string {
+  const i = name.lastIndexOf(".");
+  return i > 0 ? name.slice(i + 1).toLowerCase() : "";
+}
+
+function iconStyleFor(ext: string): Partial<FileIconProps> {
+  return (defaultStyles as Record<string, Partial<FileIconProps> | undefined>)[ext] ?? {};
+}
 
 type DirEntryInfo = {
   name: string;
@@ -32,6 +59,12 @@ type DirListing = {
   path: string;
   parent: string | null;
   entries: DirEntryInfo[];
+};
+
+type DriveInfo = {
+  letter: string;
+  label: string;
+  kind: "fixed" | "removable" | "network" | "cdrom" | "ramdisk" | "unknown";
 };
 
 type Props = {
@@ -54,6 +87,10 @@ export function ExplorerPanel({ panelKey, path }: Props) {
   const [editingLocation, setEditingLocation] = useState(false);
   const [locationDraft, setLocationDraft] = useState("");
   const [copied, setCopied] = useState(false);
+  const [past, setPast] = useState<string[]>([]);
+  const [future, setFuture] = useState<string[]>([]);
+  const [drives, setDrives] = useState<DriveInfo[]>([]);
+  const [brokenThumbs, setBrokenThumbs] = useState<Set<string>>(new Set());
 
   const { ref: barRef, width } = usePanelWidth<HTMLDivElement>();
   const focused = useSessions((s) => s.focused);
@@ -90,7 +127,56 @@ export function ExplorerPanel({ panelKey, path }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const go = (target: string) => void load(target);
+  useEffect(() => {
+    invoke<DriveInfo[]>("fs_list_drives")
+      .then(setDrives)
+      .catch(() => setDrives([]));
+  }, []);
+
+  /** Điều hướng có ghi lịch sử — dùng cho click thư mục/breadcrumb, không dùng cho back/forward. */
+  const go = (target: string) => {
+    const from = listing?.path;
+    if (from && from !== target) {
+      setPast((p) => [...p, from]);
+      setFuture([]);
+    }
+    void load(target);
+  };
+
+  const goBack = useCallback(() => {
+    if (past.length === 0) return;
+    const prev = past[past.length - 1];
+    setPast((p) => p.slice(0, -1));
+    const from = listing?.path;
+    if (from) setFuture((f) => [from, ...f]);
+    void load(prev);
+  }, [past, listing, load]);
+
+  const goForward = useCallback(() => {
+    if (future.length === 0) return;
+    const next = future[0];
+    setFuture((f) => f.slice(1));
+    const from = listing?.path;
+    if (from) setPast((p) => [...p, from]);
+    void load(next);
+  }, [future, listing, load]);
+
+  // Nút lùi/tiến trên chuột (XButton1/2) — Chromium coi đây là điều hướng trang, phải chặn
+  // hành vi mặc định rồi tự lái vào lịch sử thư mục của panel đang focus.
+  useEffect(() => {
+    const onMouseDown = (event: MouseEvent) => {
+      if (focused !== panelKey) return;
+      if (event.button === 3) {
+        event.preventDefault();
+        goBack();
+      } else if (event.button === 4) {
+        event.preventDefault();
+        goForward();
+      }
+    };
+    window.addEventListener("mousedown", onMouseDown);
+    return () => window.removeEventListener("mousedown", onMouseDown);
+  }, [focused, panelKey, goBack, goForward]);
 
   const entries = useMemo(() => {
     if (!listing) return [];
@@ -99,7 +185,6 @@ export function ExplorerPanel({ panelKey, path }: Props) {
   }, [listing, filter]);
 
   const cur = listing?.path ?? path ?? "";
-  const basename = cur.split(/[/\\]/).filter(Boolean).pop() ?? cur;
   const locationInputRef = useRef<HTMLInputElement>(null);
   const copyTimerRef = useRef<number | null>(null);
 
@@ -260,18 +345,36 @@ export function ExplorerPanel({ panelKey, path }: Props) {
     },
   ];
 
+  const driveMenu = (): MenuItem[] =>
+    drives.map((d) => ({
+      id: d.letter,
+      label: d.label ? `${d.letter}  ${d.label}` : d.letter,
+      icon: DRIVE_ICONS[d.kind] ?? <HardDrive size={13} />,
+      onClick: () => go(d.letter),
+    }));
+
   const actions: HeadAction[] = [
+    {
+      id: "back",
+      label: "Back",
+      icon: <ArrowLeft size={12} />,
+      onClick: () => past.length > 0 && goBack(),
+    },
+    {
+      id: "forward",
+      label: "Forward",
+      icon: <ArrowRight size={12} />,
+      onClick: () => future.length > 0 && goForward(),
+    },
     {
       id: "up",
       label: "Go to parent folder",
-      inline: true,
       icon: <ArrowUp size={12} />,
       onClick: () => listing?.parent && go(listing.parent),
     },
     {
       id: "reload",
       label: "Reload",
-      inline: true,
       icon: <RotateCw size={12} />,
       onClick: () => load(cur),
     },
@@ -289,8 +392,7 @@ export function ExplorerPanel({ panelKey, path }: Props) {
         panelKey={panelKey}
         kind="explorer"
         icon={<Folder size={13} />}
-        title={basename || "Files"}
-        subtitle={cur}
+        title="Explorer"
         chips={listing && <span className="chip">{listing.entries.length} items</span>}
         actions={actions}
       />
@@ -298,6 +400,16 @@ export function ExplorerPanel({ panelKey, path }: Props) {
       {/* Đường dẫn cuộn ngang được, ô lọc giữ bề ngang cố định. Để chung một khối cuộn thì
           ô lọc trôi mất theo đường dẫn dài; panel quá hẹp thì bỏ ô lọc chứ không bóp nó. */}
       <div className="ex-bar" ref={barRef}>
+        {drives.length > 0 && (
+          <button
+            className="ex-path-action icon-only"
+            onClick={(e) => openMenu(e, driveMenu())}
+            title="Switch drive"
+            aria-label="Switch drive"
+          >
+            <HardDrive size={13} />
+          </button>
+        )}
         <div className="ex-location">
           {editingLocation ? (
             <form
@@ -360,21 +472,40 @@ export function ExplorerPanel({ panelKey, path }: Props) {
         {!loading && !error && entries.length === 0 && (
           <div className="pv-loading">{filter ? "No matching items" : "Folder is empty"}</div>
         )}
-        {entries.map((e) => (
-            <button
-              key={e.path}
-              className={"ex-row" + (e.is_dir ? " dir" : "")}
-              onClick={() => (e.is_dir ? go(e.path) : openPreview(e.path))}
-              onContextMenu={(ev) => openMenu(ev, entryMenu(e))}
-              title={e.path}
-            >
-              <span className="ex-icon">
-                {e.is_dir ? <Folder size={15} /> : <File size={15} />}
-              </span>
-              <span className="ex-name">{e.name}</span>
-              <span className="ex-meta">{e.is_dir ? "" : formatBytes(e.size_bytes)}</span>
-            </button>
-          ))}
+        {entries.map((e) => {
+            const ext = e.is_dir ? "" : extOf(e.name);
+            const showThumb = !e.is_dir && IMAGE_EXTS.has(ext) && !brokenThumbs.has(e.path);
+            return (
+              <button
+                key={e.path}
+                className={"ex-row" + (e.is_dir ? " dir" : "")}
+                onClick={() => (e.is_dir ? go(e.path) : openPreview(e.path))}
+                onContextMenu={(ev) => openMenu(ev, entryMenu(e))}
+                title={e.path}
+              >
+                <span className={"ex-icon" + (showThumb ? " thumb" : "")}>
+                  {e.is_dir ? (
+                    <Folder size={15} />
+                  ) : showThumb ? (
+                    <img
+                      className="ex-thumb-img"
+                      src={convertFileSrc(e.path)}
+                      alt=""
+                      loading="lazy"
+                      draggable={false}
+                      onError={() =>
+                        setBrokenThumbs((s) => (s.has(e.path) ? s : new Set(s).add(e.path)))
+                      }
+                    />
+                  ) : (
+                    <FileIcon extension={ext} {...iconStyleFor(ext)} />
+                  )}
+                </span>
+                <span className="ex-name">{e.name}</span>
+                <span className="ex-meta">{e.is_dir ? "" : formatBytes(e.size_bytes)}</span>
+              </button>
+            );
+          })}
       </div>
 
       <ContextMenu menu={menu} onClose={closeMenu} />
