@@ -17,7 +17,7 @@
   <img src="assets/divider.svg" width="65%" alt="" />
 </div>
 
-## What it does ( •ᴗ•)੭
+## What it does
 
 Running `claude`, `codex`, `aider` (or any CLI agent) all day means it's constantly writing files, editing code, and dropping diffs — and you need to see the result *now*. Tethys watches your working directory and renders Markdown, images, and diffs the moment they land, right next to the terminal that produced them.
 
@@ -157,6 +157,5 @@ npm run tauri build
 ---
 
 <div align="center">
-  <sub>MIT Licensed · Built with 💜 by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a> ദ്ദി(˵ •̀ ᴗ - ˵ )✧</sub>
+  <sub>MIT Licensed · Built with 💜 by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a></sub>
 </div>
-</content>
