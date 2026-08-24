@@ -1,9 +1,11 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Tethys Logo" width="124" />
+  <img src="assets/logo.png" alt="Tethys logo — tiling terminal workspace for AI coding agents on Windows" width="124" />
 
   # Tethys
 
-  **Stop Alt-Tabbing. A high-performance tiling workspace designed for AI coding agents.**
+  **The all-in-one terminal workspace for AI coding agents.** ⋆｡°✩
+
+  Terminal, live file previews, and Git diffs — all in one tiling window, so you're not alt-tabbing to see what your agent just did.
 
   [![Release](https://img.shields.io/github/v/release/QuangquyNguyenvo/Tethys?style=flat-square&color=818cf8)](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)
   [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-38bdf8?style=flat-square)](https://github.com/QuangquyNguyenvo/Tethys)
@@ -12,86 +14,71 @@
   [![License](https://img.shields.io/badge/License-MIT-a855f7?style=flat-square)](LICENSE)
 
   <br />
-  <img src="assets/divider.svg" width="65%" alt="divider" />
+  <img src="assets/divider.svg" width="65%" alt="" />
 </div>
 
-## 💥 The Problem: The Alt-Tab Tax
+## What it does ( •ᴗ•)੭
 
-Running CLI coding agents (`claude`, `aider`, `codex`) all day has created a new developer bottleneck: **context switching**.
+Running `claude`, `codex`, `aider` (or any CLI agent) all day means it's constantly writing files, editing code, and dropping diffs — and you need to see the result *now*. Tethys watches your working directory and renders Markdown, images, and diffs the moment they land, right next to the terminal that produced them.
 
-```
-The Daily Alt-Tab Chaos:
-[ Terminal ] ──(Alt-Tab)──> [ VS Code Diff ] ──(Alt-Tab)──> [ Image Viewer ] ──(Alt-Tab)──> [ Browser ]
-```
-
-When an agent refactors code, generates a markdown spec, or outputs an architectural chart, you have to constantly flip between separate windows just to verify the work. 
-
-- **Traditional Terminals** (*Windows Terminal, Alacritty*): Fast, but blind to artifacts. No live previews, no diffs, no web view.
-- **Heavy Electron Workspaces** (*WaveTerm*): Sluggish 500MB+ RAM hogs with background daemons and flaky Windows ConPTY support.
-
-**Tethys fixes this.** It embeds your terminal, real-time file watcher, diff inspector, and web preview into **one lightweight, GPU-accelerated tiling workspace**.
+Everything lives on one tiling canvas: split panels, drag them around, resize freely. The terminal is a tile in your workspace, not the whole app.
 
 <div align="center">
-  <img src="assets/screenshots/preview.png" alt="Tethys Workspace Preview" width="100%" />
+  <img src="assets/screenshots/preview.png" alt="Tethys tiling terminal workspace showing multiple panels and Material You theme settings" width="100%" />
 </div>
 
 ---
 
-## ⚡ Core Capabilities
+## Features
 
 <table>
   <tr>
     <td width="50%">
-      <h4>👁️ Live Agent Watcher</h4>
-      <p>The instant your AI agent writes a file, Tethys renders the Markdown spec, visual chart (PNG/SVG), or Git diff side-by-side. Zero manual refreshing.</p>
+      <h4>Live Agent Watcher</h4>
+      <p>The instant a file changes, Tethys renders the Markdown spec, image, or Git diff side by side — no manual refresh.</p>
     </td>
     <td width="50%">
-      <h4>🚀 Sub-16ms ConPTY Engine</h4>
-      <p>Direct <code>portable-pty</code> integration with an optimized binary channel flush. Pure native Windows ConPTY with near-zero latency.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <h4>🪟 Frictionless Tiling</h4>
-      <p>Split horizontally or vertically, drag to reorder, and resize panels dynamically. Terminal is a tile, not an isolated world.</p>
-    </td>
-    <td width="50%">
-      <h4>🎨 Material You & Mica Glass</h4>
-      <p>Extracts dynamic accent palettes from your active wallpaper, paired with native Windows 11 Acrylic & Mica transparency.</p>
+      <h4>Native ConPTY Terminal</h4>
+      <p>Direct <code>portable-pty</code> integration with an optimized binary channel — near-zero input latency.</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h4>🏎️ WebGL-Accelerated Typography</h4>
-      <p>Rendered with <code>xterm.js</code> + <code>@xterm/addon-webgl</code> for crisp text and rock-solid 60+ FPS terminal throughput.</p>
+      <h4>Frictionless Tiling</h4>
+      <p>Split horizontally or vertically, drag to reorder, resize dynamically. Snap panels like native Windows tiling.</p>
     </td>
     <td width="50%">
-      <h4>🔍 OSC 133 Shell Blocks</h4>
-      <p>Semantic command isolation with exit status badges and one-click output capture (PowerShell 7 optimized).</p>
+      <h4>Material You & Mica Glass</h4>
+      <p>Accent colors extracted from your wallpaper, paired with native Windows 11 Acrylic & Mica transparency.</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h4>🧭 Animated Workspaces</h4>
-      <p>Keep separate terminal layouts alive and move between them with a soft perspective transition, direct number keys, or wraparound navigation.</p>
+      <h4>WebGL-Accelerated Terminal</h4>
+      <p>Built on <code>xterm.js</code> + <code>@xterm/addon-webgl</code> for crisp text and smooth, high-FPS scrollback.</p>
     </td>
     <td width="50%">
-      <h4>🗂️ Explorer & Embedded Web</h4>
-      <p>Browse files, copy paths, type a folder path or URL, and open local previews or web pages without leaving the tiling canvas.</p>
+      <h4>OSC 133 Command Blocks</h4>
+      <p>Semantic command isolation with exit-status badges and one-click output capture (PowerShell 7).</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h4>Animated Workspaces</h4>
+      <p>Keep multiple terminal layouts alive and switch between them with number keys or a soft transition.</p>
+    </td>
+    <td width="50%">
+      <h4>Explorer & Embedded Web</h4>
+      <p>Browse files, copy paths, or open a URL and local previews — without leaving the tiling canvas.</p>
     </td>
   </tr>
 </table>
 
----
+<details>
+<summary>Runs light, stays smooth</summary>
+<br />
 
-## 🪶 Performance Without Visual Compromises
-
-Tethys keeps the glass, blur, 60 FPS waveform, tiling motion, and workspace transitions intact. Memory and background work are reduced around them instead:
-
-- Hidden workspaces keep their PTY sessions alive, but release WebGL textures only after the transition has finished and restore them on return.
-- SIXEL/iTerm image support is loaded on demand; text-only terminals do not pay its startup and per-panel allocation cost.
-- PTY output uses bounded back-pressure, command-block metadata is capped to useful scrollback, and file watchers are dropped after the final preview closes.
-- Audio and media workers sleep while sysfetch is hidden; its waveform updates SVG paths directly instead of re-rendering the React tree every frame.
+Hidden workspaces keep their PTY sessions alive but release WebGL textures until you switch back. SIXEL/iTerm image support loads on demand. PTY output uses bounded back-pressure, and file watchers are dropped once the last preview closes.
 
 Local regression snapshot on Windows (debug build, four idle terminals, measured after 10 seconds; app + WebView2 + console process tree):
 
@@ -100,34 +87,36 @@ Local regression snapshot on Windows (debug build, four idle terminals, measured
 | Clean checkpoint `7c1194d` | 419.8 MB | 191.5 MB |
 | Optimized build, typical clean run | ~408 MB | ~187 MB |
 
-> This is a repeatable development snapshot, not a universal RAM guarantee. Wallpaper, GPU driver, WebView2 version, terminal output, inline images, and open previews all affect the final number.
+This is a repeatable development snapshot, not a universal guarantee — wallpaper, GPU driver, WebView2 version, and open previews all affect the final number.
+</details>
 
 ---
 
-## 📸 Interface
+## Interface
 
 <div align="center">
-  <img src="assets/screenshots/glass.png" alt="Mica Glass UI" width="49%" />
-  <img src="assets/screenshots/tiling.png" alt="Tiling Workspace" width="49%" />
+  <img src="assets/screenshots/glass.png" alt="Tethys Mica glass terminal panel with file explorer" width="32%" />
+  <img src="assets/screenshots/tiling.png" alt="Tethys split-panel tiling terminal workspace" width="32%" />
+  <img src="assets/screenshots/widgets.png" alt="Tethys terminal workspace with explorer, embedded web panel, and dock" width="32%" />
 </div>
 
 ---
 
-## 📥 Download & Setup
+## Download & Setup
 
-Download the latest build from **[GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)**:
+Grab the latest build from **[GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)**:
 
-- **Installer (`.msi`)**: `Tethys_x64.msi` — Standard Windows installation.
-- **Portable (`.zip`)**: `Tethys_portable.zip` — Extract and run `Tethys.exe` directly.
+- **Installer (`.msi`)** — `Tethys_x64.msi`, standard Windows install.
+- **Portable (`.zip`)** — `Tethys_portable.zip`, extract and run `Tethys.exe`.
 
-> **💡 Shell Tip**: For optimal OSC 133 command block detection, run **PowerShell 7**:
+> **Shell tip**: for the best OSC 133 command-block detection, run PowerShell 7:
 > ```powershell
 > winget install Microsoft.PowerShell
 > ```
 
 ---
 
-## ⌨️ Essential Shortcuts
+## Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
@@ -145,7 +134,7 @@ Download the latest build from **[GitHub Releases](https://github.com/QuangquyNg
 ---
 
 <details>
-<summary><b>🛠️ Build from Source (Developers)</b></summary>
+<summary><b>Build from Source (Developers)</b></summary>
 
 <br />
 
@@ -168,5 +157,6 @@ npm run tauri build
 ---
 
 <div align="center">
-  <sub>MIT Licensed · Built with 💜 by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a></sub>
+  <sub>MIT Licensed · Built with 💜 by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a> ദ്ദി(˵ •̀ ᴗ - ˵ )✧</sub>
 </div>
+</content>
