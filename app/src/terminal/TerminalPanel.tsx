@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { usePty } from "./usePty";
 import { useSessions } from "../store/sessions";
 import { PanelHeader, type HeadAction } from "../panel/PanelHeader";
+import { useThemeStore } from "../theme/useTheme";
 import type { ITheme } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
@@ -22,10 +23,11 @@ type Props = {
  */
 export function TerminalPanel({ panelKey, shell, cwd, theme, visible }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const scrollback = useThemeStore((s) => s.opts.terminalScrollback);
 
   const { state, error, blocks, running, cwd: liveCwd, copyLastOutput, jumpPrev, jumpNext } = usePty(
     host,
-    { shell, cwd, theme, panelKey, panelVisible: visible },
+    { shell, cwd, theme, panelKey, panelVisible: visible, scrollback },
   );
 
   // Đẩy thư mục thật lên store để Ctrl+Shift+D nhân đôi panel *ở đúng chỗ shell đang đứng*,

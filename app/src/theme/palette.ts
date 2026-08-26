@@ -80,6 +80,8 @@ export type ThemeOptions = {
   termChroma: number;
   /** Độ đục nền terminal, 0,3…1. 1 = đặc hẳn, không thấy ảnh nền. */
   termOpacity: number;
+  /** Số dòng output mỗi terminal giữ lại; giới hạn này chặn RAM tăng theo phiên dài. */
+  terminalScrollback: number;
   /** Kéo hue ANSI về phía màu gốc bao nhiêu phần (0 = giữ nguyên nghĩa ANSI). */
   harmonize: number;
   /**
@@ -139,6 +141,7 @@ export const DEFAULTS: ThemeOptions = {
   // gần như đen (đo được: luma 13,9). Ở 85% thì 15% ảnh nền lọt qua chỉ nâng luma lên ~17,
   // tức là *có* trong suốt nhưng không ai nhìn ra. 0,6 mới thấy được ảnh nền.
   termOpacity: 0.6,
+  terminalScrollback: 5000,
   dockAutoHide: true,
   navAutoHide: true,
   windowVibrancy: true,

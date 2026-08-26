@@ -233,6 +233,11 @@ function PanelHost({
   const focused = useSessions((s) => s.focused === panel.key);
   const isSource = useSessions((s) => s.drag?.key === panel.key);
   const focus = useSessions((s) => s.focus);
+  // Chỉ terminal cần sống khi workspace ẩn để PTY/agent không bị ngắt. Panel phụ có thể
+  // dựng lại từ store; tháo chúng xuống giải phóng iframe, ảnh đã decode, DOM preview,
+  // watcher và worker audio thay vì chỉ phủ `visibility:hidden` lên toàn bộ workload.
+  const isTerminal = panel.type === undefined || panel.type === "terminal";
+  const shouldRenderPanel = visible || isTerminal;
 
   // Fallback FLIP luôn hoạt động trên WebView2: parent nhận hình học mới một lần, còn
   // lớp visual bên trong bắt đầu tại toạ độ cũ rồi translate về vị trí thật. Không scale
@@ -279,7 +284,7 @@ function PanelHost({
         style={motionOffset ? { transform: `translate3d(${motionOffset.x}px, ${motionOffset.y}px, 0)` } : undefined}
       >
         <Suspense fallback={<div className="panel-loading" aria-label="Loading panel" />}>
-          {panel.type === "preview" && panel.path ? (
+          {shouldRenderPanel && (panel.type === "preview" && panel.path ? (
             <PreviewPanel panelKey={panel.key} path={panel.path} mode={panel.mode} />
           ) : panel.type === "explorer" ? (
             <ExplorerPanel panelKey={panel.key} path={panel.path} />
@@ -300,7 +305,7 @@ function PanelHost({
               theme={theme}
               visible={visible}
             />
-          )}
+          ))}
         </Suspense>
       </div>
       </div>

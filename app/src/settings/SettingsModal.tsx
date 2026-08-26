@@ -334,6 +334,18 @@ export function SettingsModal({ onClose }: Props) {
                 />
                 <Slider id="set-contrast" icon={<Contrast size={15} />} label="Contrast" note="0 is the Material 3 baseline." min={-1} max={1} step={0.1} value={opts.contrast} display={opts.contrast.toFixed(1)} onChange={(v) => setOpts({ contrast: v })} />
                 <Slider id="set-chroma" icon={<Palette size={15} />} label="ANSI chroma" note="Separate terminal colors from the neutral chrome." min={1} max={2.5} step={0.05} value={opts.termChroma} display={`${opts.termChroma.toFixed(2)}×`} onChange={(v) => setOpts({ termChroma: v })} />
+                <Slider
+                  id="set-scrollback"
+                  icon={<Terminal size={15} />}
+                  label="Scrollback"
+                  note="Lower values cap memory growth in long-running terminals. Applies immediately."
+                  min={1000}
+                  max={20000}
+                  step={1000}
+                  value={opts.terminalScrollback}
+                  display={`${Math.round(opts.terminalScrollback / 1000)}k lines`}
+                  onChange={(v) => setOpts({ terminalScrollback: v })}
+                />
               </Group>
             )}
 

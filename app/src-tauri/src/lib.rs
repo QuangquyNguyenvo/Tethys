@@ -148,6 +148,36 @@ fn app_window_set_vibrancy(window: tauri::Window, enabled: bool) -> Result<(), S
     Ok(())
 }
 
+/// Báo WebView2 ưu tiên thu hồi cache khi cửa sổ mất focus. Đây là mức mục tiêu native,
+/// không suspend JavaScript nên terminal vẫn đọc output và ACK luồng PTY bình thường.
+#[cfg(target_os = "windows")]
+fn set_webview_memory_target(window: &tauri::Window, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+    };
+    use windows::core::Interface;
+
+    let Some(webview) = window.app_handle().get_webview_window(window.label()) else {
+        return;
+    };
+
+    let _ = webview.with_webview(move |platform| {
+        let Ok(core) = (unsafe { platform.controller().CoreWebView2() }) else {
+            return;
+        };
+        let Ok(core_v19) = core.cast::<ICoreWebView2_19>() else {
+            return;
+        };
+        let target = if low {
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+        } else {
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+        };
+        let _ = unsafe { core_v19.SetMemoryUsageTargetLevel(target) };
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -175,6 +205,10 @@ pub fn run() {
         .on_window_event(|window, event| {
             // Đóng cửa sổ mà không dọn thì `pwsh.exe` sống tiếp (tiêu chí B4 / D4).
             match event {
+                #[cfg(target_os = "windows")]
+                tauri::WindowEvent::Focused(focused) => {
+                    set_webview_memory_target(window, !focused);
+                }
                 tauri::WindowEvent::Destroyed | tauri::WindowEvent::CloseRequested { .. } => {
                     if let Some(mgr) = window.try_state::<PtyManager>() {
                         mgr.kill_all();

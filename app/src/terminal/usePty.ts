@@ -48,7 +48,12 @@ export type PtyOptions = {
   panelKey?: string;
   /** Panel ở workspace đang nhìn thấy. Panel ẩn không cần ping backend mỗi giây. */
   panelVisible?: boolean;
+  /** Số dòng output giữ trong buffer của xterm. */
+  scrollback?: number;
 };
+
+const normalizeScrollback = (value?: number) =>
+  Math.max(1000, Math.min(20000, Math.round(value ?? 5000)));
 
 /**
  * Nối một `Terminal` của xterm.js với một PTY ở Rust.
@@ -90,7 +95,7 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
         '"CaskaydiaCove Nerd Font","Cascadia Mono",Consolas,monospace',
       fontSize: opts.fontSize ?? 15,
       cursorBlink: true,
-      scrollback: 10000,
+      scrollback: normalizeScrollback(opts.scrollback),
       // Cả 16 màu ANSI đều sinh từ ảnh nền, chroma đã nhân 1,7 lần so với chrome (U3).
       theme: opts.theme,
     });
@@ -408,6 +413,12 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
   useEffect(() => {
     if (termRef.current && opts.theme) termRef.current.options.theme = opts.theme;
   }, [opts.theme]);
+
+  // Xterm cho phép đổi giới hạn lúc đang chạy và tự cắt phần buffer vượt quá mức mới.
+  // Nhờ vậy user không cần đóng agent/terminal chỉ để áp dụng cấu hình RAM mới.
+  useEffect(() => {
+    if (termRef.current) termRef.current.options.scrollback = normalizeScrollback(opts.scrollback);
+  }, [opts.scrollback]);
 
   const copyLastOutput = () => {
     if (!trackerRef.current) return;
