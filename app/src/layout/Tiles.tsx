@@ -211,7 +211,12 @@ export function Tiles({ theme }: Props) {
   }, [allPanels]);
 
   return (
-    <div ref={hostRef} className={"tiles" + (drag ? " is-dragging" : "")}>
+    <div
+      ref={hostRef}
+      className={
+        "tiles" + (drag ? " is-dragging" : "") + (workspaceTransition ? " ws-switch" : "")
+      }
+    >
       {ready &&
         allPanels.map((p) => {
           const leaving = workspaceTransition?.leavingKeys.has(p.key) ?? false;

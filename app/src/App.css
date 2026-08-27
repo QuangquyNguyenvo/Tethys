@@ -540,6 +540,11 @@ body {
 
 /* Kéo gutter, kéo panel, và đổi kích thước cửa sổ đều phải bám tay tức thì — có
    transition là thành cao su, panel lết theo sau mép cửa sổ nửa giây. */
+/* Đổi workspace cũng vậy, nhưng vì lý do khác. Panel của workspace đang ẩn giữ lại khung
+   cuối cùng của nó; nếu cửa sổ đổi kích thước trong lúc nó ẩn, khung đó đã cũ. Quay về tab
+   ấy là panel nhận kích thước mới — và nếu nội suy, nó sẽ *phình ra* ngay giữa lúc đang
+   trượt vào, trông như một trục trặc chứ không phải một chuyển động. */
+.tiles.ws-switch .panel-host,
 body.resizing-layout .panel-host,
 body.dragging-panel .panel-host,
 body.resizing-window .panel-host,
