@@ -11,11 +11,14 @@
 #[cfg(target_os = "windows")]
 mod win {
     use windows::Win32::Foundation::{HWND, LPARAM, POINT, WPARAM};
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
     use windows::Win32::UI::WindowsAndMessaging::{
         EnableMenuItem, GetCursorPos, GetSystemMenu, IsZoomed, PostMessageW, SetForegroundWindow,
-        TrackPopupMenu, MF_DISABLED, MF_ENABLED, MF_GRAYED, SC_CLOSE, SC_MAXIMIZE, SC_MINIMIZE,
-        SC_MOVE, SC_RESTORE, SC_SIZE, TPM_LEFTALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-        WM_SYSCOMMAND,
+        SetWindowPos, TrackPopupMenu, MF_DISABLED, MF_ENABLED, MF_GRAYED, SC_CLOSE, SC_MAXIMIZE,
+        SC_MINIMIZE, SC_MOVE, SC_RESTORE, SC_SIZE, SWP_NOACTIVATE, SWP_NOZORDER, TPM_LEFTALIGN,
+        TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_SYSCOMMAND,
     };
 
     /// Lấy `HWND` mà không phụ thuộc Tauri đang link bản `windows` nào: đi vòng qua `isize`
@@ -23,6 +26,34 @@ mod win {
     pub fn hwnd_of(window: &tauri::Window) -> Result<HWND, String> {
         let raw = window.hwnd().map_err(|e| e.to_string())?;
         Ok(HWND(raw.0 as _))
+    }
+
+    /// Kéo cửa sổ phủ trọn màn hình vật lý đang chứa nó.
+    ///
+    /// Cần cái này vì `rcMonitor` (cả màn hình) khác `rcWork` (đã trừ taskbar), và với một
+    /// cửa sổ không viền thì Windows rất hay chọn `rcWork` giùm ta. Gọi sau khi Tao đã đổi
+    /// style xong: đây là lời cuối cùng về hình chữ nhật, không phải lời đầu tiên.
+    pub fn cover_monitor(hwnd: HWND) {
+        unsafe {
+            let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            let mut info = MONITORINFO {
+                cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+            if !GetMonitorInfoW(monitor, &mut info).as_bool() {
+                return;
+            }
+            let r = info.rcMonitor;
+            let _ = SetWindowPos(
+                hwnd,
+                None,
+                r.left,
+                r.top,
+                r.right - r.left,
+                r.bottom - r.top,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
     }
 
     pub fn system_menu(hwnd: HWND) {
@@ -113,18 +144,54 @@ pub fn app_window_system_menu(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
+/// Nhớ cửa sổ có đang maximize hay không ngay trước khi vào fullscreen, để thoát ra thì
+/// trả lại đúng trạng thái cũ chứ không rơi về kích thước cửa sổ nhỏ.
+#[cfg(target_os = "windows")]
+static WAS_MAXIMIZED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Đặt trạng thái fullscreen rõ ràng thay vì tự đảo trạng thái hiện tại.
 ///
 /// `set_fullscreen` của Tao xếp thay đổi cửa sổ lên UI thread. Nếu hai lệnh toggle đến
 /// sát nhau, lệnh sau có thể đọc trạng thái vừa được lệnh trước cập nhật rồi xếp thao tác
 /// ngược lại. Lệnh idempotent này khiến sự kiện F11 trùng luôn hội tụ về cùng trạng thái.
+///
+/// Trên Windows còn hai chuyện nữa phải làm, và cả hai đều xoay quanh cùng một điều:
+/// **`WS_MAXIMIZE` không tự mất khi ta vào fullscreen.**
+///
+/// 1. Cửa sổ không viền mà đang maximize thì Windows ghim nó vào `rcWork` — vùng làm việc
+///    đã trừ taskbar. Cờ đó còn nguyên sau khi đổi sang fullscreen, nên mọi lần cửa sổ
+///    được đo lại nó lại bị kéo về đúng vùng ấy: fullscreen mà vẫn chừa một dải trống ở
+///    cạnh có taskbar. Bỏ maximize *trước* là cách duy nhất để cờ đó không còn ở đó.
+/// 2. Ngay cả khi đã bỏ, `SetWindowPos` cuối cùng vẫn đáng gọi: nó nói thẳng hình chữ
+///    nhật là `rcMonitor` — cả màn hình — nên không phụ thuộc vào việc Tao chọn cái nào.
 #[tauri::command]
 pub fn app_window_set_fullscreen(
     window: tauri::Window,
     fullscreen: bool,
 ) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    if fullscreen {
+        let maximized = window.is_maximized().unwrap_or(false);
+        WAS_MAXIMIZED.store(maximized, std::sync::atomic::Ordering::Relaxed);
+        if maximized {
+            window.unmaximize().map_err(|e| e.to_string())?;
+        }
+    }
+
     window
         .set_fullscreen(fullscreen)
         .map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    {
+        if fullscreen {
+            if let Ok(hwnd) = win::hwnd_of(&window) {
+                win::cover_monitor(hwnd);
+            }
+        } else if WAS_MAXIMIZED.swap(false, std::sync::atomic::Ordering::Relaxed) {
+            window.maximize().map_err(|e| e.to_string())?;
+        }
+    }
+
     Ok(fullscreen)
 }

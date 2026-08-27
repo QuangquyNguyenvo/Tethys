@@ -21,6 +21,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Fullscreen left a strip of desktop uncovered along the taskbar edge. Windows pins an
+  undecorated *maximized* window to the work area, and that flag survived the switch into
+  fullscreen, so the window kept being pulled back off the taskbar.
+- Panel buttons in the top row could not be clicked while the titlebar was set to auto-hide,
+  which fullscreen turns on for you. The strip that keeps the bar revealed while it slides
+  covered them.
 - Settings' scroll bar was unstyled: the rule targeted `.set-content`, a class the component
   had stopped rendering.
 - Long labels in the shortcut list were truncated mid-word instead of wrapping.
