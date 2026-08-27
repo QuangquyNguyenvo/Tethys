@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   ArrowRightToLine,
   Blend,
+  Check,
   CloudFog,
   Contrast,
   Download,
@@ -224,7 +225,10 @@ export function SettingsModal({ onClose }: Props) {
         tabIndex={-1}
       >
         <aside className="set-rail">
-          <img src="/logo.png" alt="" className="set-rail-logo" draggable={false} />
+          <div className="set-rail-brand" aria-hidden="true">
+            <img src="/logo.png" alt="" className="set-rail-logo" draggable={false} />
+            <span>Tethys</span>
+          </div>
           <nav className="set-rail-nav">
             {PAGES.map((item) => (
               <button
@@ -235,7 +239,9 @@ export function SettingsModal({ onClose }: Props) {
                 aria-label={item.label}
                 onClick={() => setPage(item.id)}
               >
-                {item.icon}
+                <span className="set-rail-icon">{item.icon}</span>
+                <span className="set-rail-label">{item.label}</span>
+                <span className="set-rail-state" aria-hidden="true" />
               </button>
             ))}
           </nav>
@@ -255,6 +261,18 @@ export function SettingsModal({ onClose }: Props) {
           <div className="set-scroll">
             {page === "appearance" && (
               <>
+                <div className="set-tone-preview" aria-label={`Current Material You scheme: ${opts.scheme}`}>
+                  <span className="set-tone-copy">
+                    <small>Material You palette</small>
+                    <strong>{opts.scheme}</strong>
+                  </span>
+                  <span className="set-tone-cluster" aria-hidden="true">
+                    <i className="primary" />
+                    <i className="secondary" />
+                    <i className="tertiary" />
+                  </span>
+                </div>
+
                 <Group label="Color palette">
                   <div className="set-grid cols-2">
                     {SOURCES.map((item) => (
@@ -523,12 +541,24 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Thẻ icon + nhãn ngắn — chọn một (radio) hay bật/tắt (toggle) tuỳ nơi gọi, cùng một hình dạng
- * để mắt quét cả trang mà không phải phân biệt kiểu tương tác. Giải thích dài chờ ở `title`. */
+ * để mắt quét cả trang. Hint luôn hiện; `title` chỉ giữ bản đầy đủ cho vùng quá hẹp. */
 function OptionCard({ icon, label, hint, active, onClick }: { icon: ReactNode; label: string; hint?: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" className={"set-card" + (active ? " on" : "")} onClick={onClick} title={hint}>
+    <button
+      type="button"
+      className={"set-card" + (active ? " on" : "")}
+      onClick={onClick}
+      title={hint}
+      aria-pressed={active}
+    >
       <span className="set-card-icon">{icon}</span>
-      <span className="set-card-label">{label}</span>
+      <span className="set-card-copy">
+        <span className="set-card-label">{label}</span>
+        {hint && <small>{hint}</small>}
+      </span>
+      <span className="set-card-state" aria-hidden="true">
+        <Check size={13} strokeWidth={3} />
+      </span>
     </button>
   );
 }
