@@ -3,7 +3,7 @@ use serde::Serialize;
 /// Phần **không đổi** trong một phiên chạy: đọc một lần lúc mở panel.
 /// Tách khỏi `SystemMetrics` vì mấy trường này phải mò registry — làm việc đó mỗi giây
 /// chỉ để hiện lại đúng một chuỗi y hệt là phí I/O thuần tuý.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub os: String,
@@ -108,8 +108,17 @@ fn display_windows_name(product_name: String, build: &str) -> String {
     }
 }
 
+/// Chú thích ở `SystemInfo` nói mấy trường này không đổi trong một phiên chạy — vậy thì
+/// đọc chúng đúng một lần. Trước đây mỗi lần panel được dựng lại (đổi workspace, mở lại
+/// sysfetch) là một lượt mở bốn khoá registry nữa để nhận về đúng những chuỗi cũ.
+static INFO: std::sync::OnceLock<SystemInfo> = std::sync::OnceLock::new();
+
 #[tauri::command]
 pub fn system_info() -> SystemInfo {
+    INFO.get_or_init(read_system_info).clone()
+}
+
+fn read_system_info() -> SystemInfo {
     #[cfg(target_os = "windows")]
     {
         let build = registry_text(CURRENT_VERSION, "CurrentBuildNumber").unwrap_or_default();
@@ -184,10 +193,23 @@ fn disk_bytes() -> Option<(u64, u64)> {
     use windows_sys::Win32::System::Ioctl::{DISK_PERFORMANCE, IOCTL_DISK_PERFORMANCE};
     use windows_sys::Win32::System::IO::DeviceIoControl;
 
+    /* Số hiệu ổ nào mở được thì lần sau chỉ mở đúng những cái đó.
+       Máy điển hình có một hoặc hai ổ, nên bảy trong tám lần `CreateFileW` mỗi vòng đo là
+       gõ cửa một chỗ không có ai — mà vẫn phải trả giá một lời gọi hệ thống. Dò đủ dãy
+       đúng một lần rồi nhớ lấy.
+
+       Cắm thêm ổ giữa chừng thì nó không xuất hiện cho tới lần chạy sau; đó là cái giá
+       chấp nhận được cho một dòng số liệu đọc chơi. */
+    static DRIVES: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+
+    const PROBE_RANGE: [u32; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
+
     let (mut read, mut written) = (0u64, 0u64);
     let mut any = false;
+    let mut found: Vec<u32> = Vec::new();
+    let probing = DRIVES.get().is_none();
 
-    for index in 0..8u32 {
+    for index in DRIVES.get().map(|d| d.as_slice()).unwrap_or(&PROBE_RANGE).iter().copied() {
         let path: Vec<u16> = format!(r"\\.\PhysicalDrive{index}")
             .encode_utf16()
             .chain([0])
@@ -228,7 +250,14 @@ fn disk_bytes() -> Option<(u64, u64)> {
             read += perf.BytesRead.max(0) as u64;
             written += perf.BytesWritten.max(0) as u64;
             any = true;
+            if probing {
+                found.push(index);
+            }
         }
+    }
+
+    if probing {
+        let _ = DRIVES.set(found);
     }
 
     any.then_some((read, written))
@@ -265,8 +294,17 @@ fn net_octets() -> Option<(u64, u64)> {
     Some((rx, tx))
 }
 
+/// `io` bật thì mới đo ổ đĩa và card mạng.
+///
+/// Hai phép đo đó không rẻ: `disk_bytes` mở tới tám handle thiết bị vật lý rồi gửi một
+/// `DeviceIoControl` cho mỗi cái, `net_octets` xin Windows dựng cả bảng interface rồi giải
+/// phóng nó. Cả hai chạy **mỗi giây** trong khi panel sysfetch không in ra dòng nào cho
+/// chúng — bốn trường ấy được truyền qua IPC rồi bị bỏ đi. Mặc định tắt; nơi nào thật sự
+/// vẽ chúng thì tự bật.
 #[tauri::command]
-pub fn system_metrics() -> SystemMetrics {
+pub fn system_metrics(io: Option<bool>) -> SystemMetrics {
+    let io = io.unwrap_or(false);
+
     #[cfg(target_os = "windows")]
     {
         use windows_sys::Win32::System::SystemInformation::{
@@ -280,8 +318,8 @@ pub fn system_metrics() -> SystemMetrics {
         let now = Sample {
             at: std::time::Instant::now(),
             cpu: cpu_ticks(),
-            disk: disk_bytes(),
-            net: net_octets(),
+            disk: io.then(disk_bytes).flatten(),
+            net: io.then(net_octets).flatten(),
         };
 
         let mut guard = PREV.lock().unwrap_or_else(|e| e.into_inner());
@@ -290,9 +328,17 @@ pub fn system_metrics() -> SystemMetrics {
         drop(guard);
 
         let elapsed = prev.map(|p| now.at.duration_since(p.at).as_secs_f64()).unwrap_or(0.0);
-        // Hai lần gọi trùng đúng một khoảnh khắc thì phép chia ra vô cực. Bỏ mẫu đó đi.
+        /* Khoảng hợp lệ, hai đầu đều có lý do.
+
+           Bằng 0: hai lời gọi rơi đúng một khoảnh khắc, phép chia ra vô cực.
+
+           Quá 5 giây: giao diện ngừng hỏi khi cửa sổ mất focus, nên mốc trước có thể là từ
+           một tiếng trước. Chia cho quãng đó ra con số trung bình của cả tiếng — đúng về số
+           học, nhưng nó được dán vào ô "Load" như thể là hiện tại. Coi như chưa có mốc và
+           đợi nhịp sau còn thành thật hơn. */
+        let fresh = elapsed > 0.0 && elapsed < 5.0;
         let rate = |before: u64, after: u64| -> Option<f64> {
-            (elapsed > 0.0).then(|| after.saturating_sub(before) as f64 / elapsed)
+            fresh.then(|| after.saturating_sub(before) as f64 / elapsed)
         };
         let pair = |before: Option<(u64, u64)>, after: Option<(u64, u64)>| match (before, after) {
             (Some(b), Some(a)) => (rate(b.0, a.0), rate(b.1, a.1)),
@@ -307,7 +353,7 @@ pub fn system_metrics() -> SystemMetrics {
             uptime_seconds: unsafe { GetTickCount64() / 1_000 },
             // `kernel` của Windows **đã gồm cả thời gian idle**, nên tổng là kernel + user
             // còn phần bận là tổng trừ idle. Trừ nhầm chỗ này là ra con số luôn quá cao.
-            cpu_usage: match (prev.and_then(|p| p.cpu), now.cpu) {
+            cpu_usage: match (prev.filter(|_| fresh).and_then(|p| p.cpu), now.cpu) {
                 (Some(b), Some(a)) => {
                     let total = a.1.saturating_sub(b.1) + a.2.saturating_sub(b.2);
                     let busy = total.saturating_sub(a.0.saturating_sub(b.0));
@@ -322,6 +368,8 @@ pub fn system_metrics() -> SystemMetrics {
         };
     }
 
+    #[cfg(not(target_os = "windows"))]
+    let _ = io;
     #[cfg(not(target_os = "windows"))]
     SystemMetrics {
         memory_total: 0,

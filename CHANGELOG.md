@@ -11,6 +11,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Panels now interpolate their size as well as their position when the layout changes.
   Splitting used to slide a panel to its new place while snapping it to its new width in
   the same instant, so one movement ran at two speeds. The divider travels with them.
+- sysfetch stopped measuring things nobody reads. Every second it opened up to eight
+  physical-drive handles and built the whole network-interface table to produce four numbers
+  the panel has never printed; those are opt-in now. Static system facts are read once per
+  run instead of on every mount, the panel stops polling entirely while the window is not
+  focused, and a tick that would render identical numbers no longer re-renders at all.
 - Switching workspaces is now a proper shared-axis slide: the outgoing workspace leaves in
   240ms on an accelerating curve while the incoming one arrives over 480ms on a decelerating
   one. Both used to take 440ms on the same curve, so for most of the switch two workspaces
