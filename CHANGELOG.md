@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- Panels now interpolate their size as well as their position when the layout changes.
+  Splitting used to slide a panel to its new place while snapping it to its new width in
+  the same instant, so one movement ran at two speeds. The divider travels with them.
+- Panel travel no longer overshoots. A 12% overshoot reads as a bounce on a 32px chip and
+  as a wobble on a 700px terminal; large surfaces use M3 emphasized easing instead.
 - Replaced every `backdrop-filter` with a wallpaper that is blurred once when it is read.
   The filter re-blurred a static image on every frame, and re-ran whenever the panel's own
   content changed, so each line of terminal output blurred the whole panel.

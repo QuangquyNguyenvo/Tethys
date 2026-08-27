@@ -36,6 +36,14 @@ body {
   --motion-medium: 280ms;
   --motion-slow: 460ms;
   --motion-pop: 420ms;
+  /* Panel đổi chỗ và đổi cỡ.
+     Dài hơn phần còn lại và **không nhún**: `--e-spring-soft` vọt qua đích 12% quãng
+     đường, mà quãng đường của một panel là hàng trăm pixel — 12% của 400px là 48px chữ
+     trượt quá rồi trượt về. Trên một cái chip 32px thì đó là nảy; trên một mặt terminal
+     thì đó là rung. Đường cong emphasized của M3 đi nhanh lúc đầu, hãm dần về cuối, và
+     dừng đúng chỗ. */
+  --motion-layout: 520ms;
+  --e-layout: cubic-bezier(0.2, 0.0, 0, 1.0);
 
   /* ── Kính ──────────────────────────────────────────────────────────
      `backdrop-filter` là thứ đắt nhất trong cả tệp này: nó bắt trình duyệt đọc lại vùng
@@ -476,9 +484,21 @@ body {
   left: 0;
   min-width: 0;
   min-height: 0;
-  /* Hình học được đổi một lần. Kéo-thả dùng View Transition snapshot ở compositor thay
-     vì transition width/height khiến xterm phải reflow ở mỗi frame. */
   contain: layout paint style;
+  /* Vị trí đi bằng FLIP ở `.panel-motion` bên trong (xem `Tiles.tsx`): `transform` của
+     chính phần tử này nhảy một phát tới toạ độ mới, nên **không** được transition ở đây,
+     nếu không cùng một quãng đường bị vẽ hai lần.
+
+     Kích thước thì ngược lại — nó không đi qua FLIP nào cả. Trước đây nó nhảy: chia đôi
+     một panel là panel cũ co lại tức thì trong khi nó vẫn đang trượt sang chỗ mới, hai
+     nửa của cùng một chuyển động chạy ở hai tốc độ khác nhau. Nội suy nó ở đây khiến cả
+     hai đi cùng nhịp.
+
+     Giá phải trả là xterm `fit()` lại mỗi khung hình trong lúc animate. Đó đúng bằng thứ
+     đã xảy ra suốt khi kéo thanh chia, chỉ khác là kéo dài nửa giây rồi thôi. */
+  transition:
+    width var(--motion-layout) var(--e-layout),
+    height var(--motion-layout) var(--e-layout);
 }
 
 /* `paint` containment clips the backdrop sampling area at the tile boundary. WebView2
@@ -489,9 +509,14 @@ body {
   contain: layout style;
 }
 
-/* Kéo gutter và kéo panel phải bám tay tức thì — có transition là thành cao su. */
+/* Kéo gutter, kéo panel, và đổi kích thước cửa sổ đều phải bám tay tức thì — có
+   transition là thành cao su, panel lết theo sau mép cửa sổ nửa giây. */
 body.resizing-layout .panel-host,
 body.dragging-panel .panel-host,
+body.resizing-window .panel-host,
+body.resizing-layout .gutter,
+body.dragging-panel .gutter,
+body.resizing-window .gutter,
 .tiles.is-dragging .panel-host { transition: none; }
 
 /* Panel của workspace khác: vẫn sống, vẫn giữ kích thước, chỉ không nhìn thấy.
@@ -528,7 +553,7 @@ body.dragging-panel .panel-host,
 }
 .panel-motion.is-moving {
   will-change: transform;
-  transition: transform var(--motion-slow) var(--e-spring-soft);
+  transition: transform var(--motion-layout) var(--e-layout);
 }
 .workspace-motion {
   width: 100%;
@@ -971,6 +996,13 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   align-items: center;
   justify-content: center;
   touch-action: none;
+  /* Thanh chia không có lớp FLIP nào, nên ở đây `transform` được nội suy trực tiếp. Cùng
+     thời lượng và cùng đường cong với panel: nếu nó tới đích trước, mắt thấy một đường kẻ
+     đứng chờ giữa hai panel còn đang trượt. */
+  transition:
+    transform var(--motion-layout) var(--e-layout),
+    width var(--motion-layout) var(--e-layout),
+    height var(--motion-layout) var(--e-layout);
 }
 /* ── Settings — popup, không còn là panel trong tile ────────────────
    Từng là một block trong lưới, tự lo responsive theo bề ngang panel và dồn chữ thành

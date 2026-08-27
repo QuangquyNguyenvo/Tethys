@@ -69,13 +69,32 @@ export function Tiles({ theme }: Props) {
   useLayoutEffect(() => {
     const el = hostRef.current;
     if (!el) return;
+    let previous: Rect | null = null;
+    let settle: number | null = null;
+
+    // Panel nội suy kích thước (`.panel-host` trong `App.css`), nhưng chỉ khi hình học đổi
+    // vì *cây layout* đổi. Cửa sổ bị kéo mép thì mọi panel đổi cỡ liên tục theo tay người
+    // dùng; để transition chạy lúc đó là panel lết theo sau mép cửa sổ nửa giây một.
+    // Cờ này tắt nội suy trong lúc kéo và bật lại khi kích thước đứng yên.
+    const markWindowResize = () => {
+      document.body.classList.add("resizing-window");
+      if (settle !== null) window.clearTimeout(settle);
+      settle = window.setTimeout(() => {
+        settle = null;
+        document.body.classList.remove("resizing-window");
+      }, 180);
+    };
+
     const read = () => {
       const r = el.getBoundingClientRect();
-      setBox((prev) =>
-        prev.x === r.left && prev.y === r.top && prev.w === r.width && prev.h === r.height
-          ? prev
-          : { x: r.left, y: r.top, w: r.width, h: r.height },
-      );
+      const next = { x: r.left, y: r.top, w: r.width, h: r.height };
+      const prev = previous;
+      if (prev && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) {
+        return;
+      }
+      if (!prev || prev.w !== next.w || prev.h !== next.h) markWindowResize();
+      previous = next;
+      setBox(next);
     };
     read();
     const ro = new ResizeObserver(read);
@@ -84,6 +103,8 @@ export function Tiles({ theme }: Props) {
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", read);
+      if (settle !== null) window.clearTimeout(settle);
+      document.body.classList.remove("resizing-window");
     };
   }, []);
 
@@ -286,10 +307,12 @@ function PanelHost({
       setMotionArmed(true);
       setMotionOffset(null);
       frameRef.current = null;
+      // Phải dài hơn `--motion-layout` (520ms): hết giờ sớm là `will-change` bị gỡ ngay
+      // giữa lúc panel còn đang trượt, và lớp compositor bị gộp lại đúng lúc cần nó nhất.
       motionTimerRef.current = window.setTimeout(() => {
         motionTimerRef.current = null;
         setMotionArmed(false);
-      }, 560);
+      }, 640);
     });
     return () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
