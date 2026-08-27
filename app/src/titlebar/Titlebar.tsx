@@ -1,20 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  Boxes,
-  Code2,
-  Database,
-  FileText,
-  FlaskConical,
-  LayoutGrid,
-  Minus,
-  Plus,
-  Rocket,
-  Sparkles,
-  Square,
-  X,
-} from "lucide-react";
+import { Icon, type IconName } from "../ui/Icon";
 
 export type WorkspaceTab = {
   id: string;
@@ -31,9 +18,18 @@ type Props = {
 
 /** Icon gán theo id workspace, không theo vị trí: đóng tab bên cạnh thì icon của các tab
  *  còn lại phải đứng yên, nếu không cả thanh nhìn như vừa xáo lại. */
-const WS_ICONS = [LayoutGrid, Code2, FileText, FlaskConical, Boxes, Sparkles, Rocket, Database];
+const WS_ICONS: IconName[] = [
+  "dashboard",
+  "code",
+  "description",
+  "science",
+  "deployed-code",
+  "bolt",
+  "rocket-launch",
+  "database",
+];
 
-function iconFor(id: string) {
+function iconFor(id: string): IconName {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return WS_ICONS[h % WS_ICONS.length];
@@ -205,7 +201,7 @@ export function Titlebar({
               }
             />
             {tabs.map((t, idx) => {
-              const Icon = icons[idx];
+              const icon = icons[idx];
               const active = t.id === activeTab;
               return (
                 <div
@@ -233,7 +229,11 @@ export function Titlebar({
                   }
                 >
                   <span className="tab-face">
-                    <Icon size={14} strokeWidth={2.1} />
+                    {/* Trục FILL: workspace đang mở dùng bản đặc, các tab khác bản rỗng.
+                        Đây là cách Material You nói "đang chọn" — nhận ra bằng *hình*, chứ
+                        không phải bằng sắc độ, nên không phụ thuộc vào việc màu sinh từ ảnh
+                        nền hôm nay có tương phản đủ hay không. */}
+                    <Icon name={icon} size={18} filled={active} />
                     <span className="tab-name">{t.name}</span>
                     {tabs.length > 1 && (
                       <button
@@ -244,7 +244,7 @@ export function Titlebar({
                         }}
                         title="Close workspace"
                       >
-                        <X size={11} />
+                        <Icon name="close" size={14} />
                       </button>
                     )}
                   </span>
@@ -252,8 +252,8 @@ export function Titlebar({
                 </div>
               );
             })}
-            <button className="tab-add" onClick={onAddTab} title="Add workspace">
-              <Plus size={13} />
+            <button className="tab-add" onClick={onAddTab} title="Add workspace" aria-label="Add workspace">
+              <Icon name="add" size={18} />
             </button>
           </div>
         </div>
@@ -269,24 +269,27 @@ export function Titlebar({
               onClick={handleMinimize}
               onMouseDown={(e) => e.stopPropagation()}
               title="Minimize"
+              aria-label="Minimize"
             >
-              <Minus size={13} />
+              <Icon name="remove" size={18} />
             </button>
             <button
               className="win-btn"
               onClick={handleMaximize}
               onMouseDown={(e) => e.stopPropagation()}
               title="Maximize / Restore"
+              aria-label="Maximize or restore"
             >
-              <Square size={11} />
+              <Icon name="crop-square" size={16} />
             </button>
             <button
               className="win-btn close"
               onClick={handleClose}
               onMouseDown={(e) => e.stopPropagation()}
               title="Close"
+              aria-label="Close"
             >
-              <X size={13} />
+              <Icon name="close" size={18} />
             </button>
           </div>
         </div>

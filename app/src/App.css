@@ -79,7 +79,9 @@ body {
   --gap: 10px;
   /* Lề quanh thanh trên. Đây là thứ biến nó từ "dính mép" thành "nổi". */
   --bar-inset: 8px;
-  --nav-bar-h: 40px;
+  /* 44px là chiều cao nhỏ nhất còn chứa được một vùng bấm 32px cùng lề trên dưới 6px.
+     Bản 40px ép mọi thứ bên trong xuống dưới ngưỡng đó. */
+  --nav-bar-h: 44px;
   /* Cao thực: thanh 40px cộng khoảng hở nổi 8px ở phía trên. */
   --titlebar-h: calc(var(--nav-bar-h) + var(--bar-inset));
   --head-h: 34px;
@@ -128,8 +130,10 @@ body {
   position: relative;
   z-index: 100;
   -webkit-app-region: drag;
+  /* Thanh chrome trượt vào thì hãm dần rồi dừng, không nhún: nó là một mặt phẳng dài chạy
+     hết bề ngang cửa sổ, nhún một cái là cả hàng chữ và icon trên đó đi quá rồi lùi lại. */
   transition:
-    transform var(--motion-slow) var(--e-spring-soft),
+    transform 420ms var(--e-decelerate),
     opacity var(--motion-medium) var(--e-standard);
 }
 
@@ -255,18 +259,18 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   font-weight: 700;
-  font-size: 12.5px;
-  letter-spacing: -0.01em;
+  font-size: 13px;
+  letter-spacing: 0.1px;
   color: var(--ui-on-surface);
   flex: none;
   padding-right: 2px;
 }
 
 .brand-logo {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: var(--r-sm);
   object-fit: cover;
   flex: none;
@@ -298,8 +302,8 @@ body {
   top: 50%;
   left: 0;
   width: var(--tab-width, 0px);
-  height: 30px;
-  margin-top: -15px;
+  height: 32px;
+  margin-top: -16px;
   border-radius: var(--r-full);
   background: var(--ui-secondary-container);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 18%, transparent);
@@ -308,9 +312,14 @@ body {
   pointer-events: none;
   contain: layout paint;
   will-change: transform;
+  /* Hai thời lượng lệch nhau là chủ ý, không phải bỏ sót.
+     Pill neo bên trái, nên `transform` là mép trái còn `width` là mép phải. Cho mép trái
+     tới đích trước rồi mép phải đuổi theo thì trong lúc đi pill *giãn ra rồi thu lại* —
+     đúng cái shape morph mà Material dùng cho thanh chọn, thay vì một hình chữ nhật cứng
+     trượt ngang. Bằng nhau thì nó chỉ là một khối trượt. */
   transition:
-    transform var(--motion-slow) var(--e-spring-soft),
-    width var(--motion-slow) var(--e-spring-soft),
+    transform 400ms var(--e-emphasized),
+    width 500ms var(--e-emphasized),
     opacity var(--motion-fast) var(--e-standard);
 }
 
@@ -332,15 +341,20 @@ body {
   z-index: 1;
 }
 
+/* `label-large` của Material 3: 13px, weight 500, letter-spacing 0.1px. Một thanh tiêu đề
+   desktop chật hơn thanh tab của điện thoại nên lấy 13 thay vì 14 — phần còn lại của thang
+   giữ nguyên, vì chính khoảng cách chữ mới là thứ khiến nhãn nhỏ đọc ra là nhãn chứ không
+   phải chữ bị thu nhỏ. */
 .tab-face {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 11px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
   border-radius: var(--r-full);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.1px;
   color: var(--ui-on-surface-variant);
   white-space: nowrap;
   transition:
@@ -348,6 +362,7 @@ body {
     color var(--motion-fast) var(--e-standard),
     transform var(--motion-medium) var(--e-spring);
 }
+.tab-face svg { flex: none; }
 
 .tab-item:not(.active):hover .tab-face {
   background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent);
@@ -358,7 +373,7 @@ body {
 .tab-item.active .tab-face {
   color: var(--ui-on-secondary-container);
   background: transparent;
-  font-weight: 650;
+  font-weight: 600;
 }
 .tab-item:active .tab-face { transform: scale(0.96); }
 
@@ -389,13 +404,26 @@ body {
 /* Nút đóng chỉ hiện khi rê vào đúng tab đó — bốn dấu × nằm sẵn trên thanh là bốn thứ
    nhấp nháy trong tầm mắt suốt ngày, mà đóng workspace là việc hoạn hữu. */
 .tab-item:hover .tab-close { opacity: 0.75; }
-.tab-close { width: 15px; height: 15px; margin-right: -3px; }
-.tab-add { width: 28px; height: 28px; opacity: 0.62; align-self: center; margin-bottom: 0; }
-.tab-add { position: relative; z-index: 1; }
+.tab-close { width: 18px; height: 18px; margin-right: -4px; }
+/* Nút thêm workspace là *hành động*, không phải một tab nữa — cho nó một mặt tonal riêng
+   để mắt không xếp nó vào cùng hàng với các tab. */
+.tab-add {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+  opacity: 1;
+  align-self: center;
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--ui-on-surface) 6%, transparent);
+  color: var(--ui-on-surface-variant);
+}
+/* Lớp trạng thái theo Material 3: rê chuột 8%, bấm 12%. */
 .tab-close:hover,
 .tab-add:hover {
   opacity: 1;
   background: color-mix(in srgb, var(--ui-on-surface) 14%, transparent);
+  color: var(--ui-on-surface);
 }
 .tab-add:active,
 .tab-close:active { transform: scale(0.86); }
@@ -404,8 +432,8 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
-  height: 24px;
-  padding: 0 10px;
+  height: 28px;
+  padding: 0 12px;
   border-radius: var(--r-full);
   border: none;
   background: color-mix(in srgb, var(--ui-on-surface) 7%, transparent);
@@ -435,8 +463,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-full);
   border: none;
   background: transparent;
@@ -449,10 +477,11 @@ body {
     transform var(--motion-medium) var(--e-spring);
 }
 .win-btn:hover {
-  background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent);
+  background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent);
   color: var(--ui-on-surface);
-  transform: scale(1.08);
+  transform: none;
 }
+.win-btn:focus-visible { background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent); }
 .win-btn.close:hover { background: var(--ui-error); color: var(--ui-on-error); }
 .win-btn:active { transform: scale(0.88); }
 

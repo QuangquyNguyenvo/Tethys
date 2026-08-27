@@ -11,6 +11,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Panels now interpolate their size as well as their position when the layout changes.
   Splitting used to slide a panel to its new place while snapping it to its new width in
   the same instant, so one movement ran at two speeds. The divider travels with them.
+- The top bar follows Material You the way Settings already does. Workspace, window and
+  add-workspace icons come from Material Symbols and the active workspace switches to the
+  filled variant, so which tab is open reads from the icon's shape rather than from a tint.
+  Targets are 32px, hover uses an 8% state layer instead of growing the button, and the type
+  scale is M3 label-large.
+- The active-workspace pill stretches as it travels. Its left edge settles in 400ms and its
+  right edge in 500ms, which is Material's shape morph; two equal durations only slid a
+  rectangle sideways.
 - sysfetch stopped measuring things nobody reads. Every second it opened up to eight
   physical-drive handles and built the whole network-interface table to produce four numbers
   the panel has never printed; those are opt-in now. Static system facts are read once per
