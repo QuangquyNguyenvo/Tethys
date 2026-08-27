@@ -132,13 +132,22 @@ body {
   opacity: 0.86;
 }
 
+/* Dải bắc cầu giữ `:hover` sống trong lúc thanh trượt xuống — nếu không, con trỏ rời
+   khỏi cái sliver 8px là thanh lại thụt lên ngay giữa chừng.
+
+   Chiều cao của nó là một đánh đổi thật, không phải con số tuỳ ý: dải này `pointer-events:
+   auto` và nằm ở `z-index` cao hơn canvas, nên bao nhiêu pixel nó phủ xuống là bấy nhiêu
+   pixel đầu panel không bấm được. Bản 28px liếm tới y=36, trong khi hàng nút của panel
+   trên cùng nằm ở y≈21–43: nút đóng, nút chia, nút `⋯` của mọi panel hàng đầu đều chết —
+   và fullscreen thì luôn bật chế độ này, nên trong fullscreen chúng chết luôn.
+   8px vừa đủ bắc qua khe, và kết thúc ở y=16, trên đầu hàng nút. */
 .app.nav-auto .titlebar::before {
   content: "";
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  height: 28px;
+  height: 8px;
   pointer-events: auto;
   z-index: 101;
 }
@@ -736,8 +745,8 @@ body.dragging-panel .panel-head { cursor: grabbing; }
 
 /* Hàng nút chỉ hiện rõ trên panel đang chọn, hoặc khi rê chuột vào.
    Mở bốn panel là bốn hàng biểu tượng cùng lúc đập vào mắt — mà mỗi lúc ta chỉ thao tác
-   trên đúng một panel. Vẫn bấm được khi mờ (`pointer-events` không tắt): rê tới là nó
-   hiện trước khi kịp bấm, và trình đo tự động vẫn chạm được. */
+   trên đúng một panel. Rê vào panel là cả hàng hiện lại trước khi con trỏ kịp tới nút,
+   nên trên thực tế không có nút nào phải "đợi" mới bấm được. */
 .panel-actions {
   visibility: hidden;
   opacity: 0;
@@ -1706,12 +1715,16 @@ body.dragging-panel * {
   transform: none;
   opacity: 1;
 }
+/* Cùng một đánh đổi như dải của thanh trên, ở đầu kia màn hình: dải này che mất bấy nhiêu
+   pixel đáy panel. 32px ăn tới 22px cuối của terminal — đủ để hụt một lần bôi đen dòng
+   cuối. Đáy panel không có nút nào nên không nghiêm trọng bằng, nhưng cũng không cần rộng
+   thế: chuột ném xuống đáy màn hình thì dừng ở y=0, 16px là quá đủ để bắt. */
 .dock-hot {
   position: absolute;
   left: 0;
   right: 0;
   bottom: calc(var(--gap) * -1);
-  height: 32px;
+  height: 16px;
   pointer-events: auto;
 }
 /* Giữ vùng bắt chuột sống trong suốt lúc dock trồi lên. Tắt nó ngay khi `:hover` vừa
