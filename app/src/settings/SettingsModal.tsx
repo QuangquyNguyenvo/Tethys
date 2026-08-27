@@ -1,32 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ArrowRightToLine,
-  Blend,
-  Check,
-  CloudFog,
-  Contrast,
-  Download,
-  Droplet,
-  Hash,
-  Image as ImageIcon,
-  ImagePlus,
-  Keyboard,
-  LayoutGrid,
-  Layers,
-  Maximize2,
-  Moon,
-  Palette,
-  PanelBottom,
-  PanelTop,
-  RefreshCw,
-  RotateCw,
-  Sparkles,
-  Square,
-  SquareStack,
-  Terminal,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Icon, type IconName } from "../ui/Icon";
 import { useThemeStore, refreshSeed, setCustomWallpaper, useDesktopWallpaper } from "../theme/useTheme";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
@@ -43,32 +16,32 @@ import {
 
 const SCHEMES: SchemeName[] = ["TonalSpot", "Vibrant", "Expressive", "Neutral", "Content", "Monochrome"];
 
-const SOURCES: { id: ColorSource; name: string; icon: ReactNode; hint: string }[] = [
-  { id: "brand", name: "Tethys", icon: <Sparkles size={17} />, hint: "Teal and navy taken directly from the logo. Consistent on every device." },
-  { id: "wallpaper", name: "Wallpaper", icon: <ImageIcon size={17} />, hint: "Material You extracts the source colors from your desktop wallpaper." },
+const SOURCES: { id: ColorSource; name: string; icon: IconName; hint: string }[] = [
+  { id: "brand", name: "Tethys", icon: "shapes", hint: "Teal and navy from the logo." },
+  { id: "wallpaper", name: "Wallpaper", icon: "wallpaper", hint: "Colors read from your wallpaper." },
 ];
 
-const SURFACES: { id: SurfaceStyle; name: string; icon: ReactNode; hint: string }[] = [
-  { id: "flat", name: "Flat", icon: <Square size={17} />, hint: "Solid surfaces, crisp borders, no blur or wallpaper." },
-  { id: "glass", name: "Glass", icon: <Layers size={17} />, hint: "Translucent chrome that reveals the wallpaper underneath." },
+const SURFACES: { id: SurfaceStyle; name: string; icon: IconName; hint: string }[] = [
+  { id: "flat", name: "Flat", icon: "square", hint: "Solid surfaces, no blur." },
+  { id: "glass", name: "Glass", icon: "layers", hint: "Translucent — wallpaper shows through." },
 ];
 
-const LAYOUTS: { id: LayoutMode; name: string; icon: ReactNode; hint: string }[] = [
-  { id: "spiral", name: "Spiral", icon: <RotateCw size={17} />, hint: "Alternates horizontal and vertical splits, always splitting the newest panel." },
-  { id: "dwindle", name: "Longest side", icon: <Maximize2 size={17} />, hint: "Automatically splits along the panel's longest side." },
-  { id: "manual", name: "To the right", icon: <ArrowRightToLine size={17} />, hint: "New panels always appear on the right." },
+const LAYOUTS: { id: LayoutMode; name: string; icon: IconName; hint: string }[] = [
+  { id: "spiral", name: "Spiral", icon: "rotate_right", hint: "Alternates horizontal and vertical splits." },
+  { id: "dwindle", name: "Longest side", icon: "open_in_full", hint: "Splits along the longest side." },
+  { id: "manual", name: "To the right", icon: "keyboard_tab", hint: "New panels appear on the right." },
 ];
 
 const KEYS: { keys: string[]; what: string }[] = [
   { keys: ["Ctrl", "T"], what: "New terminal" },
   { keys: ["Ctrl", "W"], what: "Close panel" },
-  { keys: ["Ctrl", "1 / 3"], what: "Previous / next workspace" },
+  { keys: ["Ctrl", "1 / 3"], what: "Prev / next workspace" },
   { keys: ["Alt", "1…9"], what: "Switch workspace" },
-  { keys: ["Win", "← ↑ ↓ →"], what: "Snap the selected panel" },
-  { keys: ["Ctrl", "Alt", "← ↑ ↓ →"], what: "Snap panel (alternative to the Windows key)" },
-  { keys: ["Ctrl", "Shift", "E / O"], what: "Place panel right / below" },
+  { keys: ["Win", "← ↑ ↓ →"], what: "Snap selected panel" },
+  { keys: ["Ctrl", "Alt", "← ↑ ↓ →"], what: "Snap panel (no Win key)" },
+  { keys: ["Ctrl", "Shift", "E / O"], what: "Place right / below" },
   { keys: ["Ctrl", "Shift", "D"], what: "Duplicate panel" },
-  { keys: ["Ctrl", "Shift", "Tab"], what: "Next panel" },
+  { keys: ["Ctrl", "Tab"], what: "Next panel" },
   { keys: ["Ctrl", "K"], what: "Command palette" },
   { keys: ["Ctrl", ","], what: "Settings" },
   { keys: ["F11", "or", "Alt", "Enter"], what: "Toggle fullscreen" },
@@ -79,12 +52,12 @@ type Page = "appearance" | "terminal" | "layout" | "keys" | "updates";
 
 type UpdateState = "idle" | "checking" | "none" | "available" | "downloading" | "installed" | "error";
 
-const PAGES: { id: Page; label: string; blurb: string; icon: ReactNode }[] = [
-  { id: "appearance", label: "Appearance", blurb: "Colors, materials, and the floating chrome.", icon: <Palette size={18} /> },
-  { id: "terminal", label: "Terminal", blurb: "Crisp text over a translucent surface.", icon: <Terminal size={18} /> },
-  { id: "layout", label: "Layout", blurb: "How new panels split and grow.", icon: <LayoutGrid size={18} /> },
-  { id: "keys", label: "Shortcuts", blurb: "What Tethys intercepts before the shell.", icon: <Keyboard size={18} /> },
-  { id: "updates", label: "Updates", blurb: "Check GitHub for a newer build.", icon: <RefreshCw size={18} /> },
+const PAGES: { id: Page; label: string; blurb: string; icon: IconName }[] = [
+  { id: "appearance", label: "Appearance", blurb: "Color, surface, wallpaper.", icon: "palette" },
+  { id: "terminal", label: "Terminal", blurb: "Opacity, contrast, scrollback.", icon: "terminal" },
+  { id: "layout", label: "Layout", blurb: "How new panels split.", icon: "grid_view" },
+  { id: "keys", label: "Shortcuts", blurb: "Keys Tethys takes before the shell.", icon: "keyboard" },
+  { id: "updates", label: "Updates", blurb: "Check for a newer build.", icon: "refresh" },
 ];
 
 type Props = { onClose: () => void };
@@ -239,7 +212,9 @@ export function SettingsModal({ onClose }: Props) {
                 aria-label={item.label}
                 onClick={() => setPage(item.id)}
               >
-                <span className="set-rail-icon">{item.icon}</span>
+                <span className="set-rail-icon">
+                  <Icon name={item.icon} size={24} filled={page === item.id} />
+                </span>
                 <span className="set-rail-label">{item.label}</span>
                 <span className="set-rail-state" aria-hidden="true" />
               </button>
@@ -254,7 +229,7 @@ export function SettingsModal({ onClose }: Props) {
               <p>{active.blurb}</p>
             </div>
             <button className="set-close" onClick={requestClose} title="Close (Esc)" aria-label="Close settings">
-              <X size={16} />
+              <Icon name="close" size={20} />
             </button>
           </header>
 
@@ -270,6 +245,7 @@ export function SettingsModal({ onClose }: Props) {
                     <i className="primary" />
                     <i className="secondary" />
                     <i className="tertiary" />
+                    <i className="surface" />
                   </span>
                 </div>
 
@@ -286,13 +262,15 @@ export function SettingsModal({ onClose }: Props) {
                       />
                     ))}
                   </div>
-                  <div className="set-status">
+                  {/* Duong dan day du keo vien trang thai dai gan het chieu ngang, bien mot
+                      chu thich thanh mot khoi chu. Chi ten tep o day; ban day du trong tooltip. */}
+                  <div className="set-status" title={source === "wallpaper" ? wallpaper : undefined}>
                     <span className={source === "fallback" ? "source-dot" : "source-dot live"} />
                     {opts.colorSource === "brand"
                       ? "Tethys brand colors"
                       : source === "wallpaper"
-                        ? `Reading ${wallpaper || "your wallpaper"}`
-                        : "Fallback colors — wallpaper unreadable"}
+                        ? wallpaper ? `From ${fileName(wallpaper)}` : "From your wallpaper"
+                        : "Fallback — wallpaper unreadable"}
                   </div>
 
                   {/* Phong cách màu và nút đồng bộ chỉ có nghĩa khi màu thật sự đến từ ảnh nền. */}
@@ -309,7 +287,7 @@ export function SettingsModal({ onClose }: Props) {
                           </button>
                         ))}
                       </div>
-                      <ActionRow icon={<RefreshCw size={16} />} label="Sync wallpaper" note="Extract colors again after changing your wallpaper." action="Refresh" onClick={() => refreshSeed()} />
+                      <ActionRow icon={<Icon name="refresh" size={22} />} label="Sync wallpaper" note="Re-read colors after changing wallpaper." action="Refresh" onClick={() => refreshSeed()} />
                     </>
                   )}
                 </Group>
@@ -331,7 +309,7 @@ export function SettingsModal({ onClose }: Props) {
 
                 <Group label="Wallpaper">
                   <ActionRow
-                    icon={<ImageIcon size={16} />}
+                    icon={<Icon name="wallpaper" size={22} />}
                     label="Workspace wallpaper"
                     note={wallpaper ? wallpaper : "Using your desktop wallpaper."}
                     action="Choose image"
@@ -347,9 +325,9 @@ export function SettingsModal({ onClose }: Props) {
                     }}
                   />
                   <ActionRow
-                    icon={<Undo2 size={16} />}
+                    icon={<Icon name="undo" size={22} />}
                     label="Use desktop wallpaper"
-                    note="Use your current Windows wallpaper again."
+                    note="Back to the Windows wallpaper."
                     action="Restore"
                     onClick={() => {
                       setOpts({ surfaceStyle: "glass", colorSource: "wallpaper" });
@@ -360,11 +338,11 @@ export function SettingsModal({ onClose }: Props) {
 
                 <Group label="Sysfetch logo">
                   <ActionRow
-                    icon={<ImagePlus size={16} />}
+                    icon={<Icon name="add_photo_alternate" size={22} />}
                     label="Logo image"
                     note={
                       logoMissing
-                        ? "Saved logo is missing — choose the image again."
+                        ? "Saved logo is missing."
                         : opts.sysfetchLogoPath
                           ? fileName(opts.sysfetchLogoPath)
                           : "Using the TETHYS text logo."
@@ -377,17 +355,17 @@ export function SettingsModal({ onClose }: Props) {
                     }}
                   />
                   {opts.sysfetchLogoPath && (
-                    <ActionRow icon={<Undo2 size={16} />} label="Restore text logo" note="Return to the ASCII TETHYS logo." action="Restore" onClick={() => setOpts({ sysfetchLogoPath: "" })} />
+                    <ActionRow icon={<Icon name="undo" size={22} />} label="Restore text logo" note="Back to the text logo." action="Restore" onClick={() => setOpts({ sysfetchLogoPath: "" })} />
                   )}
                 </Group>
 
                 <Group label="Chrome">
                   <div className="set-grid cols-3">
-                    <OptionCard icon={<PanelTop size={17} />} label="Top bar auto-hide" hint="Move the pointer to the top edge to reveal it." active={opts.navAutoHide} onClick={() => setOpts({ navAutoHide: !opts.navAutoHide })} />
-                    <OptionCard icon={<PanelBottom size={17} />} label="Dock auto-hide" hint="Move the pointer to the bottom edge to reveal it." active={opts.dockAutoHide} onClick={() => setOpts({ dockAutoHide: !opts.dockAutoHide })} />
-                    <OptionCard icon={<Moon size={17} />} label="Dark theme" hint="Optimized for long terminal sessions." active={opts.dark} onClick={() => setOpts({ dark: !opts.dark })} />
-                    <OptionCard icon={<Blend size={17} />} label="Mica / Acrylic" hint="Blend the wallpaper into the window surface." active={opts.windowVibrancy !== false} onClick={() => setOpts({ windowVibrancy: !(opts.windowVibrancy !== false) })} />
-                    <OptionCard icon={<CloudFog size={17} />} label="Blur surfaces" hint="Turn off to prioritize FPS with heavy output." active={opts.blurEffects !== false} onClick={() => setOpts({ blurEffects: !(opts.blurEffects !== false) })} />
+                    <OptionCard icon="web_asset" label="Top bar auto-hide" hint="Reveal at the top edge." active={opts.navAutoHide} onClick={() => setOpts({ navAutoHide: !opts.navAutoHide })} />
+                    <OptionCard icon="bottom_panel_open" label="Dock auto-hide" hint="Reveal at the bottom edge." active={opts.dockAutoHide} onClick={() => setOpts({ dockAutoHide: !opts.dockAutoHide })} />
+                    <OptionCard icon="dark_mode" label="Dark theme" hint="Tuned for long sessions." active={opts.dark} onClick={() => setOpts({ dark: !opts.dark })} />
+                    <OptionCard icon="gradient" label="Mica / Acrylic" hint="Blend wallpaper into the window." active={opts.windowVibrancy !== false} onClick={() => setOpts({ windowVibrancy: !(opts.windowVibrancy !== false) })} />
+                    <OptionCard icon="blur_on" label="Blur surfaces" hint="Turn off for more FPS." active={opts.blurEffects !== false} onClick={() => setOpts({ blurEffects: !(opts.blurEffects !== false) })} />
                   </div>
                 </Group>
               </>
@@ -397,9 +375,9 @@ export function SettingsModal({ onClose }: Props) {
               <Group label="Surface">
                 <Slider
                   id="set-opacity"
-                  icon={<Droplet size={15} />}
+                  icon={<Icon name="opacity" size={22} />}
                   label="Opacity"
-                  note={opts.surfaceStyle === "flat" ? "Flat surfaces are always opaque — switch to Glass to adjust this." : "Lower values reveal more of the wallpaper."}
+                  note={opts.surfaceStyle === "flat" ? "Flat surfaces are always opaque." : "Lower values reveal more of the wallpaper."}
                   disabled={opts.surfaceStyle === "flat"}
                   min={TERM_OPACITY_MIN * 100}
                   max={TERM_OPACITY_MAX * 100}
@@ -408,13 +386,13 @@ export function SettingsModal({ onClose }: Props) {
                   display={opts.surfaceStyle === "flat" ? "100%" : `${Math.round(opts.termOpacity * 100)}%`}
                   onChange={(v) => setOpts({ termOpacity: v / 100 })}
                 />
-                <Slider id="set-contrast" icon={<Contrast size={15} />} label="Contrast" note="0 is the Material 3 baseline." min={-1} max={1} step={0.1} value={opts.contrast} display={opts.contrast.toFixed(1)} onChange={(v) => setOpts({ contrast: v })} />
-                <Slider id="set-chroma" icon={<Palette size={15} />} label="ANSI chroma" note="Separate terminal colors from the neutral chrome." min={1} max={2.5} step={0.05} value={opts.termChroma} display={`${opts.termChroma.toFixed(2)}×`} onChange={(v) => setOpts({ termChroma: v })} />
+                <Slider id="set-contrast" icon={<Icon name="contrast" size={22} />} label="Contrast" note="0 is the Material 3 baseline." min={-1} max={1} step={0.1} value={opts.contrast} display={opts.contrast.toFixed(1)} onChange={(v) => setOpts({ contrast: v })} />
+                <Slider id="set-chroma" icon={<Icon name="palette" size={22} />} label="ANSI chroma" note="Saturation of terminal colors." min={1} max={2.5} step={0.05} value={opts.termChroma} display={`${opts.termChroma.toFixed(2)}×`} onChange={(v) => setOpts({ termChroma: v })} />
                 <Slider
                   id="set-scrollback"
-                  icon={<Terminal size={15} />}
+                  icon={<Icon name="terminal" size={22} />}
                   label="Scrollback"
-                  note="Lower values cap memory growth in long-running terminals. Applies immediately."
+                  note="Lower values cap memory growth."
                   min={1000}
                   max={20000}
                   step={1000}
@@ -439,7 +417,7 @@ export function SettingsModal({ onClose }: Props) {
                     />
                   ))}
                 </div>
-                <div className="set-tip">Use the ‹ › buttons to switch panels; drag the handle in a header to move a panel to a new position.</div>
+                <div className="set-tip">Drag a panel header to move it. Use ‹ › to switch panels.</div>
               </Group>
             )}
 
@@ -447,8 +425,8 @@ export function SettingsModal({ onClose }: Props) {
               <>
                 <Group label="Key priority">
                   <div className="set-grid cols-2">
-                    <OptionCard icon={<SquareStack size={17} />} label="Ctrl+T / Ctrl+W" hint="Open and close panels like browser tabs." active={opts.tabShortcuts} onClick={() => setOpts({ tabShortcuts: !opts.tabShortcuts })} />
-                    <OptionCard icon={<Hash size={17} />} label="Alt+1…9" hint="Jump directly to the corresponding workspace." active={opts.workspaceAltKeys} onClick={() => setOpts({ workspaceAltKeys: !opts.workspaceAltKeys })} />
+                    <OptionCard icon="tab" label="Tab-style panels" hint="Ctrl+T and Ctrl+W open and close panels like browser tabs." active={opts.tabShortcuts} onClick={() => setOpts({ tabShortcuts: !opts.tabShortcuts })} />
+                    <OptionCard icon="tag" label="Workspace numbers" hint="Alt+1…9 jumps straight to a workspace." active={opts.workspaceAltKeys} onClick={() => setOpts({ workspaceAltKeys: !opts.workspaceAltKeys })} />
                   </div>
                 </Group>
                 <Group label="Shortcut list">
@@ -469,7 +447,7 @@ export function SettingsModal({ onClose }: Props) {
             {page === "updates" && (
               <Group label="Version">
                 <ActionRow
-                  icon={<Download size={16} />}
+                  icon={<Icon name="download" size={22} />}
                   label={`Tethys ${appVersion || "…"}`}
                   note={updateNote(updateState, updateInfo, updateError)}
                   action={
@@ -540,9 +518,14 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Thẻ icon + nhãn ngắn — chọn một (radio) hay bật/tắt (toggle) tuỳ nơi gọi, cùng một hình dạng
- * để mắt quét cả trang. Hint luôn hiện; `title` chỉ giữ bản đầy đủ cho vùng quá hẹp. */
-function OptionCard({ icon, label, hint, active, onClick }: { icon: ReactNode; label: string; hint?: string; active: boolean; onClick: () => void }) {
+/** Thẻ icon + nhãn — chọn một (radio) hay bật/tắt (toggle) tuỳ nơi gọi, cùng một hình dạng
+ * để mắt quét cả trang.
+ *
+ * Icon nằm trên, chiếm phần lớn thẻ: ở một lưới 2–3 cột thì hình khối phân biệt được từ xa
+ * còn dòng chữ thì không. `hint` từng in thẳng dưới nhãn ở cỡ 9.5px — nhỏ hơn ngưỡng đọc
+ * thoải mái, và mười mấy dòng như vậy trên một trang biến bảng chọn thành bài đọc. Nó lùi
+ * vào `title`: vẫn tra được khi cần, không chiếm chỗ khi không. */
+function OptionCard({ icon, label, hint, active, onClick }: { icon: IconName; label: string; hint?: string; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -551,13 +534,12 @@ function OptionCard({ icon, label, hint, active, onClick }: { icon: ReactNode; l
       title={hint}
       aria-pressed={active}
     >
-      <span className="set-card-icon">{icon}</span>
-      <span className="set-card-copy">
-        <span className="set-card-label">{label}</span>
-        {hint && <small>{hint}</small>}
+      <span className="set-card-icon" aria-hidden="true">
+        <Icon name={icon} size={32} filled={active} />
       </span>
+      <span className="set-card-label">{label}</span>
       <span className="set-card-state" aria-hidden="true">
-        <Check size={13} strokeWidth={3} />
+        <Icon name="check" size={17} filled />
       </span>
     </button>
   );
@@ -597,13 +579,13 @@ function updateNote(state: UpdateState, info: Update | null, error: string): str
     case "available":
       return info ? `Version ${info.version} is available.` : "A new version is available.";
     case "downloading":
-      return "Downloading and installing — Tethys will restart automatically.";
+      return "Installing — Tethys will restart.";
     case "installed":
       return "Installed. Restarting…";
     case "error":
       return `Update check failed: ${error}`;
     case "idle":
     default:
-      return "Press Check for updates to look for a newer build.";
+      return "No check run yet.";
   }
 }

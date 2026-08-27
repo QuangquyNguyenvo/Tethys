@@ -29,9 +29,32 @@ body {
   --e-window: cubic-bezier(0.16, 1, 0.3, 1);
   --e-spring: cubic-bezier(0.34, 1.38, 0.64, 1);
   --e-spring-soft: cubic-bezier(0.22, 1.12, 0.36, 1);
+  /* Vọt qua đích rồi mới lùi về — đây là thứ tạo cảm giác "nảy" chứ không phải thời lượng.
+     Chỉ dùng cho thao tác người dùng vừa bấm; dữ liệu đứng yên mà nảy thì thành cẩu thả. */
+  --e-jiggle: cubic-bezier(0.34, 1.56, 0.64, 1);
   --motion-fast: 140ms;
   --motion-medium: 280ms;
   --motion-slow: 460ms;
+  --motion-pop: 420ms;
+
+  /* ── Kính ──────────────────────────────────────────────────────────
+     `backdrop-filter` là thứ đắt nhất trong cả tệp này: nó bắt trình duyệt đọc lại vùng
+     nền, làm mờ, rồi ghép lại **mỗi khung hình** — và nó chạy lại khi *nội dung của chính
+     phần tử* đổi, không riêng khi nền đổi. Panel terminal phủ phần lớn màn hình và vẽ lại
+     mỗi lần có ký tự mới, nên mỗi dòng log là một lần làm mờ toàn panel.
+
+     Nhưng thứ nằm dưới các bề mặt kính ở đây là ảnh nền — một tấm ảnh không đổi. Làm mờ nó
+     lại từ đầu mỗi khung hình là làm đi làm lại một phép tính cho ra cùng một kết quả.
+     `--wall-blur` là bản đã mờ sẵn, tính đúng một lần lúc đọc ảnh nền (xem `useTheme.ts`);
+     phần còn lại chỉ là dán ảnh, tô màu và rắc hạt — compositor làm được mà không cần GPU
+     đọc lại nền.
+
+     `fixed` neo ảnh theo khung nhìn chứ không theo phần tử, nên panel có trượt hay đổi kích
+     thước thì mảng ảnh dưới lớp kính vẫn khớp liền mạch với nền trần xung quanh. */
+  --wall-blur: none;
+  /* Hạt mịn là thứ khiến một mảng mờ đọc ra là *vật liệu* chứ không phải một vùng bị nhoè.
+     Độ đậm nằm trong thuộc tính opacity của chính SVG — rất khẽ, thấy được thì thành nhiễu. */
+  --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
 
   /* Shape scale M3 */
   --r-xs: 6px;
@@ -164,20 +187,29 @@ body {
   border-radius: var(--r-xl);
   /* Same dark, layered material as the settings surface. It remains clearly separate
      from a bright wallpaper without becoming a second blue strip across the window. */
-  background: color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent),
+      color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent)
+    ),
+    var(--glass-noise) 0 0 / 120px 120px,
+    var(--wall-blur) center center / cover fixed,
+    var(--ui-surface-container-high);
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 58%, transparent);
-  backdrop-filter: blur(24px) saturate(125%);
   box-shadow: var(--shadow-1);
 }
 
-/* Chế độ hiệu năng: giữ surface trong suốt nhưng bỏ compositor blur vốn tốn GPU nhất. */
+/* Chế độ hiệu năng.
+   Trước đây khối này tắt `backdrop-filter`, thứ đắt nhất lúc bấy giờ. Giờ không còn lớp lọc
+   nào để tắt: kính đã là ảnh tĩnh. Thứ còn tốn là chính tấm ảnh — mỗi bề mặt kính là một
+   lớp nữa để compositor ghép, và trên máy yếu thì nhiều lớp lớn vẫn có giá. Bỏ ảnh đi, các
+   bề mặt rơi về màu đặc: vẫn đọc được, và không còn gì để ghép. */
 .app.effects-off .tb-bar,
 .app.effects-off .dock,
-.app.effects-off .panel.terminal-panel,
-.app.effects-off .palette-backdrop,
-.app.effects-off .settings-backdrop,
-.app.effects-off .ctx-menu {
-  backdrop-filter: none;
+.app.effects-off .panel.terminal-panel {
+  --wall-blur: none;
+  --term-glass: none;
+  --glass-noise: none;
 }
 
 .titlebar-left,
@@ -595,10 +627,14 @@ body.dragging-panel .panel-host,
   transition: border-color var(--motion-fast) var(--e-standard);
 }
 
-/* U1 — không glow. Panel đang chọn phân biệt bằng viền accent và thanh đầu sáng hơn. */
+/* U1 — không glow. Panel đang chọn phân biệt bằng viền accent và thanh đầu sáng hơn.
+   Viền ngoài 1px cộng một vệt trong 38% là quá mảnh để nhận ra ở khoảng cách ngồi thường,
+   nhất là khi nền sau panel là ảnh nhiều chi tiết: hai đường mảnh cạnh nhau chỉ đọc ra là
+   một đường hơi đậm. Vệt trong dày 2px và đặc hẳn thì tổng cộng là 3px màu accent liền
+   mạch — thấy ngay mà vẫn không thành khung tranh. */
 .panel-host.on .panel {
   border-color: var(--ui-primary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 38%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ui-primary);
 }
 .panel-host.on .panel-head { background: var(--ui-surface-container-high); }
 
@@ -608,12 +644,39 @@ body.dragging-panel .panel-host,
 
    Alpha nằm ở *một* lớp duy nhất — màu nền của chính xterm (`--term-bg`). Panel bỏ trống
    nền, nếu không hai lớp alpha nhân nhau và 85% hoá ra 97,8%, tức là gần như không trong.
-   `backdrop-filter` làm mờ ảnh nền lọt qua; khi đục hẳn thì `--term-backdrop` là `none`
-   nên lớp lọc biến mất luôn khỏi cây vẽ. */
-.panel.terminal-panel {
-  background: transparent;
-  backdrop-filter: var(--term-backdrop, none);
+   Ảnh nền lọt qua là bản đã làm mờ sẵn (`--wall-blur`); khi đục hẳn thì `--term-glass`
+   là `none` nên không có tấm ảnh nào bị vẽ ra dưới một lớp che kín. */
+/* Lớp kính.
+   `background-attachment: fixed` là cách thường dùng để neo ảnh theo khung nhìn, nhưng nó
+   gãy ở đây: panel được đặt vị trí bằng `transform`, và một phần tử có `transform` trở
+   thành mốc neo cho chính `fixed` — nên mỗi panel phủ trọn một bản ảnh thay vì cắt đúng
+   mảng của nó.
+
+   Thay vào đó, lớp kính là một lớp phủ **đúng bằng khung nhìn**, kéo ngược lại đúng toạ độ
+   của bề mặt. Vì lớp phủ có kích thước khung nhìn thật, `cover` cắt ảnh y hệt như
+   `.app-wallpaper-bg` cắt — hai lớp khớp nhau từng pixel, không cần biết tỉ lệ ảnh. */
+.panel.terminal-panel::before {
+  content: "";
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
+  left: calc(-1 * var(--px, 0px));
+  top: calc(-1 * var(--py, 0px));
+  /* `--term-glass` là `none` khi terminal đục hẳn — khi đó lớp này không vẽ gì ngoài hạt. */
+  background-image: var(--glass-noise), var(--term-glass, none);
+  background-position: 0 0, center center;
+  background-size: 120px 120px, cover;
 }
+
+.panel.terminal-panel {
+  /* Nền là ảnh đã mờ sẵn, không phải một lớp lọc chạy mỗi khung hình. xterm vẽ `--term-bg`
+     (có alpha) đè lên, nên độ đục vẫn do đúng một lớp quyết định như trước. */
+  background: transparent;
+}
+
+
 
 .panel.terminal-panel .panel-head {
   background: color-mix(
@@ -846,7 +909,7 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
 
 /* Scroll surfaces share one quiet Material thumb. `.pv` is PreviewPanel's real
    scroll container; both Firefox syntax and WebView2 pseudo-elements are kept. */
-.set-content,
+.set-scroll,
 .ex-list,
 .sysfetch-container,
 .pv,
@@ -855,7 +918,7 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   scrollbar-color: color-mix(in srgb, var(--ui-primary) 46%, var(--ui-outline)) transparent;
   scrollbar-gutter: stable;
 }
-.set-content::-webkit-scrollbar,
+.set-scroll::-webkit-scrollbar,
 .ex-list::-webkit-scrollbar,
 .sysfetch-container::-webkit-scrollbar,
 .pv::-webkit-scrollbar,
@@ -863,12 +926,12 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   width: 10px;
   height: 10px;
 }
-.set-content::-webkit-scrollbar-track,
+.set-scroll::-webkit-scrollbar-track,
 .ex-list::-webkit-scrollbar-track,
 .sysfetch-container::-webkit-scrollbar-track,
 .pv::-webkit-scrollbar-track,
 .palette-list::-webkit-scrollbar-track { background: transparent; }
-.set-content::-webkit-scrollbar-thumb,
+.set-scroll::-webkit-scrollbar-thumb,
 .ex-list::-webkit-scrollbar-thumb,
 .sysfetch-container::-webkit-scrollbar-thumb,
 .pv::-webkit-scrollbar-thumb,
@@ -879,7 +942,7 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   background: color-mix(in srgb, var(--ui-primary) 46%, var(--ui-outline));
   background-clip: content-box;
 }
-.set-content::-webkit-scrollbar-thumb:hover,
+.set-scroll::-webkit-scrollbar-thumb:hover,
 .ex-list::-webkit-scrollbar-thumb:hover,
 .sysfetch-container::-webkit-scrollbar-thumb:hover,
 .pv::-webkit-scrollbar-thumb:hover,
@@ -913,8 +976,7 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--ui-background) 48%, transparent);
-  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--ui-scrim, #000) 58%, transparent);
   padding: 24px;
   animation: overlay-in 180ms var(--e-standard) both;
 }
@@ -956,11 +1018,11 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
 
 .set-rail {
   flex: none;
-  width: 184px;
+  width: 192px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 20px;
+  gap: 22px;
   padding: 18px 12px;
   background: color-mix(in srgb, var(--ui-secondary-container) 24%, var(--ui-surface-container-high));
   border-right: 1px solid color-mix(in srgb, var(--ui-outline-variant) 30%, transparent);
@@ -972,61 +1034,55 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   gap: 10px;
   padding: 0 8px;
   color: var(--ui-on-surface);
-  font-size: 13px;
-  font-weight: 720;
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 .set-rail-logo { width: 34px; height: 34px; border-radius: var(--r-md); object-fit: cover; }
-.set-rail-nav { display: flex; flex-direction: column; gap: 7px; }
+.set-rail-nav { display: flex; flex-direction: column; gap: 6px; }
 .set-rail-nav button {
   width: 100%;
-  min-height: 48px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
-  padding: 6px 10px 6px 7px;
+  gap: 12px;
+  padding: 6px 12px 6px 8px;
   border: none;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ui-on-surface-variant);
   cursor: pointer;
   transition:
     background var(--motion-fast) var(--e-standard),
     color var(--motion-fast) var(--e-standard),
-    border-radius var(--motion-medium) var(--e-spring-soft),
-    transform var(--motion-medium) var(--e-spring);
+    transform var(--motion-medium) var(--e-jiggle);
 }
 .set-rail-nav button:hover {
   background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent);
   color: var(--ui-on-surface);
-  border-radius: var(--r-xl);
   transform: translate3d(2px, 0, 0);
 }
 .set-rail-nav button.on {
-  border-radius: var(--r-xl);
-  background: var(--ui-primary-container);
-  color: var(--ui-on-primary-container);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 24%, transparent);
+  background: var(--ui-secondary-container);
+  color: var(--ui-on-secondary-container);
 }
 .set-rail-nav button:active { transform: scale(0.94); }
 .set-rail-icon {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-full);
-  transition:
-    background var(--motion-fast) var(--e-standard),
-    transform var(--motion-medium) var(--e-spring);
+  transition: background var(--motion-fast) var(--e-standard);
 }
 .set-rail-nav button.on .set-rail-icon {
-  background: color-mix(in srgb, var(--ui-primary) 14%, transparent);
-  transform: rotate(-3deg) scale(1.04);
+  color: var(--ui-primary);
+  animation: set-jiggle 620ms linear;
 }
-.set-rail-label { min-width: 0; flex: 1; text-align: left; font-size: 11.5px; font-weight: 580; }
+.set-rail-label { min-width: 0; flex: 1; text-align: left; font-size: 14px; font-weight: 500; }
 .set-rail-state {
   width: 6px;
   height: 6px;
@@ -1035,9 +1091,36 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   background: currentColor;
   opacity: 0;
   transform: scale(0.4);
-  transition: opacity var(--motion-fast) var(--e-standard), transform var(--motion-medium) var(--e-spring);
+  transition: opacity var(--motion-fast) var(--e-standard), transform var(--motion-medium) var(--e-jiggle);
 }
 .set-rail-nav button.on .set-rail-state { opacity: 0.72; transform: scale(1); }
+
+/* ── Chuyển động ────────────────────────────────────────────────────
+   Hai nhịp, và chỉ hai. `set-pop-in` đưa nội dung vào chỗ với một cú vọt qua đích rất nhỏ;
+   `set-jiggle` là squash-and-stretch của phim hoạt hình — bẹp chiều này thì phình chiều kia,
+   thể tích không đổi — dành riêng cho thứ người dùng vừa bấm.
+
+   Không rải jiggle lên danh sách phím tắt hay thanh trượt: chỗ chỉ để đọc mà nảy lên thì
+   trông như lỗi chứ không như vui. Cả khối tự tắt dưới `prefers-reduced-motion` nhờ lớp
+   reset chung ở cuối file. */
+/* Biên độ: bẹp 20% là mức của phim hoạt hình, đúng cho một quả bóng rơi. Trên một con chip
+   chữ hay một icon 32px thì cùng biên độ ấy đọc ra là giao diện bị lỗi — chữ méo hẳn đi
+   trong hai phần mười giây. Hạ xuống 7%: vẫn là squash-and-stretch, vẫn nhận ra là nảy,
+   nhưng không còn kéo méo thứ người ta đang đọc. */
+@keyframes set-jiggle {
+  0%   { transform: scale(1, 1);       animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1); }
+  13%  { transform: scale(1.07, 0.94); animation-timing-function: ease-in-out; }
+  27%  { transform: scale(0.96, 1.045); animation-timing-function: ease-in-out; }
+  41%  { transform: scale(1.035, 0.975); animation-timing-function: ease-in-out; }
+  55%  { transform: scale(0.98, 1.02); animation-timing-function: ease-in-out; }
+  68%  { transform: scale(1.015, 0.99); animation-timing-function: ease-in-out; }
+  80%  { transform: scale(0.99, 1.01); animation-timing-function: ease-in-out; }
+  100% { transform: scale(1, 1); }
+}
+@keyframes set-pop-in {
+  from { opacity: 0; transform: scale(0.94) translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
 
 .set-body {
   flex: 1;
@@ -1053,20 +1136,19 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 24px 24px 18px;
-  border-bottom: 1px solid color-mix(in srgb, var(--ui-outline-variant) 18%, transparent);
+  padding: 26px 26px 20px;
 }
-.set-title { animation: settings-title-in 340ms var(--e-spring-soft) both; }
+.set-title { animation: settings-title-in 340ms var(--e-jiggle) backwards; }
 @keyframes settings-title-in {
-  from { opacity: 0; transform: translate3d(8px, 0, 0); }
+  from { opacity: 0; transform: translate3d(10px, 0, 0); }
   to { opacity: 1; transform: none; }
 }
-.set-head h2 { font-size: 25px; line-height: 1.1; letter-spacing: -0.035em; color: var(--ui-on-surface); font-weight: 740; }
-.set-head p { margin-top: 5px; color: var(--ui-on-surface-variant); font-size: 11.5px; }
+.set-head h2 { font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; color: var(--ui-on-surface); font-weight: 700; }
+.set-head p { margin-top: 4px; color: var(--ui-on-surface-variant); font-size: 14px; line-height: 1.4; }
 .set-close {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1078,124 +1160,125 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   transition:
     background var(--motion-fast) var(--e-standard),
     color var(--motion-fast) var(--e-standard),
-    transform var(--motion-medium) var(--e-spring);
+    transform var(--motion-medium) var(--e-jiggle);
 }
 .set-close:hover {
   background: var(--ui-error-container);
   color: var(--ui-on-error-container);
-  transform: rotate(5deg) scale(1.06);
+  transform: rotate(90deg) scale(1.08);
 }
-.set-close:active { transform: scale(0.88); }
+.set-close:active { transform: rotate(90deg) scale(0.88); }
 
-.set-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 22px 28px; scrollbar-gutter: stable; }
+.set-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 26px 32px; scrollbar-gutter: stable; }
 
 .set-tone-preview {
-  min-height: 96px;
+  min-height: 104px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   border-radius: var(--r-xxl);
   background: var(--ui-secondary-container);
   color: var(--ui-on-secondary-container);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-secondary) 18%, transparent);
-  animation: settings-group-in 360ms var(--e-spring-soft) both;
+  animation: set-pop-in var(--motion-pop) var(--e-jiggle) backwards;
 }
-.set-tone-copy { display: flex; flex-direction: column; gap: 3px; }
-.set-tone-copy small { font-size: 10px; font-weight: 640; letter-spacing: 0.055em; text-transform: uppercase; opacity: 0.72; }
-.set-tone-copy strong { font-size: 20px; line-height: 1.1; letter-spacing: -0.025em; }
-.set-tone-cluster { display: flex; align-items: center; justify-content: flex-end; min-width: 132px; }
+.set-tone-copy { display: flex; flex-direction: column; gap: 4px; }
+.set-tone-copy small { font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+.set-tone-copy strong { font-size: 22px; line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; }
+.set-tone-cluster { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: none; }
 .set-tone-cluster i {
   display: block;
   flex: none;
-  border: 3px solid var(--ui-secondary-container);
-  box-shadow: 0 3px 10px rgb(0 0 0 / 0.15);
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-on-secondary-container) 18%, transparent);
 }
-.set-tone-cluster .primary { width: 54px; height: 54px; border-radius: var(--r-full); background: var(--ui-primary); }
-.set-tone-cluster .secondary { width: 58px; height: 38px; margin-left: -12px; border-radius: var(--r-full); background: var(--ui-on-secondary-container); }
-.set-tone-cluster .tertiary { width: 42px; height: 42px; margin-left: -10px; border-radius: var(--r-lg); background: var(--ui-tertiary); transform: rotate(8deg); }
+.set-tone-cluster .primary { background: var(--ui-primary); }
+.set-tone-cluster .secondary { background: var(--ui-secondary); }
+.set-tone-cluster .tertiary { background: var(--ui-tertiary); }
+.set-tone-cluster .surface { background: var(--ui-surface-container-lowest); }
 
+/* Nhóm không còn là một thẻ có nền riêng. Thẻ trong thẻ trong thẻ là thứ làm màn hình này
+   trông như xếp hộp: ba lớp bề mặt chồng nhau mà không lớp nào nói thêm điều gì. Giờ chỉ
+   còn một lớp — thẻ lựa chọn — và các nhóm tách nhau bằng khoảng trống. */
 .set-group {
-  margin-top: 12px;
-  padding: 15px;
-  border-radius: var(--r-xl);
-  background: color-mix(in srgb, var(--ui-surface-container) 82%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-outline-variant) 16%, transparent);
-  animation: settings-group-in 360ms var(--e-spring-soft) both;
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: set-pop-in var(--motion-pop) var(--e-jiggle) backwards;
 }
-.set-group:first-child { margin-top: 0; }
-.set-tone-preview + .set-group { margin-top: 12px; }
-.set-group:nth-of-type(2) { animation-delay: 32ms; }
-.set-group:nth-of-type(3) { animation-delay: 64ms; }
-.set-group:nth-of-type(4) { animation-delay: 96ms; }
-.set-group:nth-of-type(n + 5) { animation-delay: 116ms; }
-@keyframes settings-group-in {
-  from { opacity: 0; transform: translate3d(0, 10px, 0); }
-  to { opacity: 1; transform: none; }
-}
+.set-group:first-child { margin-top: 4px; }
+.set-tone-preview + .set-group { margin-top: 34px; }
+.set-group:nth-of-type(2) { animation-delay: 40ms; }
+.set-group:nth-of-type(3) { animation-delay: 80ms; }
+.set-group:nth-of-type(4) { animation-delay: 120ms; }
+.set-group:nth-of-type(n + 5) { animation-delay: 150ms; }
 .set-group-label {
-  margin: 0 2px 12px;
-  font-size: 12px;
+  margin: 0 4px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   color: var(--ui-primary);
 }
 
-/* Lưới thẻ — trục chính của "nhìn hiểu nhanh hơn đọc". Icon lớn, nhãn ngắn; viền + nền
-   màu báo trạng thái "đang bật" thay vì phải đọc chữ On/Off. */
-.set-grid { display: grid; gap: 8px; }
+/* Lưới thẻ — trục chính của "nhìn hiểu nhanh hơn đọc". Icon lớn nằm trên, nhãn một dòng
+   nằm dưới: ở lưới 2–3 cột thì hình khối phân biệt được từ xa, dòng chữ thì không. */
+.set-grid { display: grid; gap: 10px; }
 .set-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .set-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .set-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 11px;
-  min-height: 88px;
-  padding: 13px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 112px;
+  padding: 18px;
   border: none;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   background: var(--ui-surface-container-high);
   color: var(--ui-on-surface-variant);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  animation: set-pop-in 300ms var(--e-jiggle) backwards;
   transition:
     background var(--motion-fast) var(--e-standard),
     color var(--motion-fast) var(--e-standard),
-    border-color var(--motion-fast) var(--e-standard),
-    border-radius var(--motion-medium) var(--e-spring-soft),
-    transform var(--motion-medium) var(--e-spring);
+    border-radius var(--motion-medium) var(--e-jiggle),
+    transform var(--motion-medium) var(--e-jiggle);
 }
+.set-grid .set-card:nth-child(2) { animation-delay: 45ms; }
+.set-grid .set-card:nth-child(3) { animation-delay: 90ms; }
+.set-grid .set-card:nth-child(4) { animation-delay: 135ms; }
+.set-grid .set-card:nth-child(n + 5) { animation-delay: 170ms; }
 .set-card:hover {
   background: var(--ui-surface-container-highest);
   color: var(--ui-on-surface);
-  border-radius: var(--r-xl);
-  transform: translate3d(0, -2px, 0);
+  border-radius: var(--r-xxl);
+  transform: translate3d(0, -3px, 0);
 }
-.set-card:active { transform: scale(0.97); }
+.set-card:active { transform: scale(0.96); }
 .set-card-icon {
-  width: 42px;
-  height: 42px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--ui-on-surface) 7%, transparent);
-  transition:
-    background var(--motion-fast) var(--e-standard),
-    color var(--motion-fast) var(--e-standard),
-    border-radius var(--motion-medium) var(--e-spring-soft),
-    transform var(--motion-medium) var(--e-spring);
+  color: var(--ui-on-surface-variant);
+  transition: color var(--motion-fast) var(--e-standard);
 }
-.set-card-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.set-card-label { color: inherit; font-size: 11.5px; font-weight: 640; line-height: 1.25; }
-.set-card-copy small { color: inherit; font-size: 9.5px; line-height: 1.35; opacity: 0.68; }
+.set-card-label { color: inherit; font-size: 14px; font-weight: 500; line-height: 1.3; }
 .set-card-state {
-  width: 24px;
-  height: 24px;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1203,153 +1286,166 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   background: var(--ui-primary);
   color: var(--ui-on-primary);
   opacity: 0;
-  transform: scale(0.55) rotate(-12deg);
-  transition: opacity var(--motion-fast) var(--e-standard), transform var(--motion-medium) var(--e-spring);
+  transform: scale(0.4);
+  transition: opacity var(--motion-fast) var(--e-standard), transform var(--motion-medium) var(--e-jiggle);
 }
 .set-card.on {
-  border-radius: var(--r-xl);
   background: var(--ui-primary-container);
   color: var(--ui-on-primary-container);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 28%, transparent);
 }
 .set-card.on .set-card-icon {
-  border-radius: var(--r-full);
-  background: var(--ui-primary);
-  color: var(--ui-on-primary);
-  transform: scale(1.06) rotate(-3deg);
+  color: var(--ui-primary);
+  /* Chỉ nảy đúng cái vừa bật. Trạng thái "đang bật" vẫn đọc được bằng hình đặc, màu và dấu
+     tick khi chuyển động đã dừng — hoặc khi người dùng tắt chuyển động hẳn. */
+  animation: set-jiggle 620ms linear;
 }
-.set-card.on .set-card-label { font-weight: 680; }
-.set-card.on .set-card-state { opacity: 1; transform: scale(1) rotate(0); }
+.set-card.on .set-card-label { font-weight: 600; }
+.set-card.on .set-card-state { opacity: 1; transform: scale(1); }
 
 .set-status {
   width: fit-content;
-  margin-top: 10px;
-  padding: 6px 9px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px 12px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   border-radius: var(--r-full);
   background: var(--ui-surface-container-high);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ui-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.source-dot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--ui-outline); flex: none; }
+.source-dot { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--ui-outline); flex: none; }
 .source-dot.live { background: var(--ui-tertiary); }
 
-.set-chips { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; }
+.set-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .set-chip {
-  min-height: 30px;
+  min-height: 36px;
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 46%, transparent);
-  background: color-mix(in srgb, var(--ui-surface-container-lowest) 46%, transparent);
+  background: transparent;
   color: var(--ui-on-surface-variant);
   border-radius: var(--r-full);
-  padding: 5px 12px;
+  padding: 6px 16px;
   font: inherit;
-  font-size: 10.5px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition:
     background var(--motion-fast) var(--e-standard),
     color var(--motion-fast) var(--e-standard),
     border-color var(--motion-fast) var(--e-standard),
-    transform var(--motion-medium) var(--e-spring);
+    transform var(--motion-medium) var(--e-jiggle);
 }
 .set-chip:hover {
   background: var(--ui-surface-container-highest);
   color: var(--ui-on-surface);
   border-color: transparent;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
-.set-chip:active { transform: scale(0.96); }
-.set-chip.on { background: var(--ui-primary-container); border-color: transparent; color: var(--ui-on-primary-container); font-weight: 680; }
+.set-chip:active { transform: scale(0.94); }
+.set-chip.on {
+  background: var(--ui-primary-container);
+  border-color: transparent;
+  color: var(--ui-on-primary-container);
+  font-weight: 600;
+}
 
 /* Hàng thao tác / trượt — vẫn cần đọc (giá trị số, ghi chú động như tên file đang chọn),
    nên giữ dạng hàng thay vì ép vào lưới thẻ; icon đầu hàng vẫn cho mắt quét trước khi đọc. */
 .set-item {
-  min-height: 64px;
-  padding: 12px 13px;
+  min-height: 72px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 14px;
   border-radius: var(--r-lg);
   background: var(--ui-surface-container-high);
   color: var(--ui-on-surface);
 }
-.set-item + .set-item { margin-top: 8px; }
 .set-item-icon {
   flex: none;
-  width: 34px;
-  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--ui-on-surface) 6%, transparent);
   color: var(--ui-on-surface-variant);
 }
-.set-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.set-label { font-size: 12px; font-weight: 560; color: var(--ui-on-surface); }
-.set-copy small { font-size: 10.5px; color: var(--ui-on-surface-variant); line-height: 1.4; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.set-label { font-size: 14px; font-weight: 500; color: var(--ui-on-surface); }
+.set-copy small { font-size: 12px; color: var(--ui-on-surface-variant); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-btn {
   flex: none;
-  min-height: 30px;
+  min-height: 38px;
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 46%, transparent);
-  background: color-mix(in srgb, var(--ui-surface-container-lowest) 46%, transparent);
+  background: transparent;
   color: var(--ui-on-surface-variant);
   border-radius: var(--r-full);
-  padding: 5px 13px;
+  padding: 6px 18px;
   font: inherit;
-  font-size: 10.5px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition:
     background var(--motion-fast) var(--e-standard),
     color var(--motion-fast) var(--e-standard),
     border-color var(--motion-fast) var(--e-standard),
-    transform var(--motion-medium) var(--e-spring);
+    transform var(--motion-medium) var(--e-jiggle);
 }
 .set-btn:hover {
   background: var(--ui-primary-container);
   color: var(--ui-on-primary-container);
   border-color: transparent;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
-.set-btn:active { transform: scale(0.96); }
+.set-btn:active { transform: scale(0.94); }
 
 .set-slider { align-items: center; flex-wrap: wrap; }
-.set-slider input[type="range"] { flex-basis: 100%; width: 100%; height: 16px; margin: 0; accent-color: var(--ui-primary); background: transparent; }
+.set-slider input[type="range"] { flex-basis: 100%; width: 100%; height: 18px; margin: 0; accent-color: var(--ui-primary); background: transparent; }
 .set-slider.off { opacity: 0.55; }
 .set-slider.off input[type="range"] { cursor: not-allowed; }
 .set-val {
   flex: none;
-  min-width: 44px;
-  padding: 4px 8px;
+  min-width: 52px;
+  padding: 5px 10px;
   border-radius: var(--r-full);
   background: var(--ui-surface-container-highest);
   color: var(--ui-on-surface-variant);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   text-align: center;
   white-space: nowrap;
 }
 
-.set-tip { margin-top: 12px; padding: 12px 14px; border-radius: var(--r-lg); color: var(--ui-on-tertiary-container); font-size: 10.5px; line-height: 1.55; background: var(--ui-tertiary-container); }
+.set-tip { padding: 14px 16px; border-radius: var(--r-lg); color: var(--ui-on-tertiary-container); font-size: 13px; line-height: 1.5; background: var(--ui-tertiary-container); }
 
-.set-keylist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
+/* Hai cột đủ chỗ cho mười ba dòng mà không phải cuộn. Cột phím tự co theo cụm dài nhất,
+   phần còn lại thuộc về nhãn — một nhãn dài thì xuống dòng chứ không bị nuốt bằng dấu ba
+   chấm. "Snap panel (alternative to…" không nói được gì cho ai. */
+.set-keylist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
 .set-key {
-  min-height: 38px;
-  padding: 7px 10px;
-  display: flex;
+  min-height: 46px;
+  padding: 9px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   border-radius: var(--r-md);
   background: var(--ui-surface-container-high);
 }
-.set-key-what { min-width: 0; color: var(--ui-on-surface-variant); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.set-key-combo { display: flex; gap: 3px; justify-content: flex-end; flex: none; }
+.set-key-what {
+  min-width: 0;
+  color: var(--ui-on-surface-variant);
+  font-size: 13px;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.set-key-combo { display: flex; gap: 4px; justify-content: flex-end; flex: none; }
 .settings-modal kbd {
   font-family: var(--font-mono);
-  font-size: 9.5px;
-  padding: 3px 6px;
+  font-size: 11px;
+  padding: 4px 7px;
   border-radius: var(--r-xs);
   background: var(--ui-surface-container-highest);
   color: var(--ui-on-surface);
@@ -1362,11 +1458,11 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
 }
 
 @media (max-width: 760px) {
-  .set-rail { width: 72px; align-items: center; padding-inline: 9px; }
+  .set-rail { width: 80px; align-items: center; padding-inline: 10px; }
   .set-rail-brand { justify-content: center; padding: 0; }
   .set-rail-brand span, .set-rail-label, .set-rail-state { display: none; }
   .set-rail-nav { width: 100%; align-items: center; }
-  .set-rail-nav button { width: 48px; padding: 7px; justify-content: center; }
+  .set-rail-nav button { width: 56px; padding: 8px; justify-content: center; }
 }
 
 @media (max-width: 520px) {
@@ -1379,25 +1475,26 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   }
   .set-rail {
     width: 100%;
-    height: 60px;
+    height: 64px;
     flex-direction: row;
     align-items: center;
     gap: 8px;
-    padding: 7px 9px;
+    padding: 8px 10px;
     border-right: none;
     border-bottom: 1px solid color-mix(in srgb, var(--ui-outline-variant) 30%, transparent);
   }
   .set-rail-brand { display: none; }
   .set-rail-nav { flex: 1; flex-direction: row; justify-content: space-between; gap: 4px; }
-  .set-rail-nav button { width: 46px; min-height: 44px; padding: 5px; }
-  .set-rail-icon { width: 34px; height: 34px; }
-  .set-head { padding: 18px 16px 13px; }
-  .set-head h2 { font-size: 19px; }
-  .set-scroll { padding: 12px 10px 18px; }
-  .set-tone-preview { min-height: 88px; padding: 14px; border-radius: var(--r-xl); }
-  .set-tone-cluster { min-width: 108px; transform: scale(0.86); transform-origin: right center; }
-  .set-group { padding: 12px; }
+  .set-rail-nav button { width: 52px; min-height: 48px; padding: 5px; }
+  .set-rail-icon { width: 38px; height: 38px; }
+  .set-head { padding: 18px 16px 14px; }
+  .set-head h2 { font-size: 21px; }
+  .set-scroll { padding: 4px 14px 20px; }
+  .set-tone-preview { min-height: 92px; padding: 14px; border-radius: var(--r-xl); }
+  .set-tone-cluster { gap: 7px; transform: scale(0.84); transform-origin: right center; }
   .set-grid.cols-2, .set-grid.cols-3 { grid-template-columns: minmax(0, 1fr); }
+  .set-card { min-height: 96px; flex-direction: row; align-items: center; gap: 14px; }
+  .set-card-state { position: static; margin-left: auto; }
 }
 
 .gutter.row { cursor: col-resize; }
@@ -1633,9 +1730,15 @@ body.dragging-panel * {
   gap: 6px;
   padding: 7px;
   border-radius: var(--r-xxl);
-  background: color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent),
+      color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent)
+    ),
+    var(--glass-noise) 0 0 / 120px 120px,
+    var(--wall-blur) center center / cover fixed,
+    var(--ui-surface-container-high);
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 58%, transparent);
-  backdrop-filter: blur(24px) saturate(125%);
   box-shadow: var(--shadow-1);
   pointer-events: auto;
   user-select: none;
@@ -1673,27 +1776,14 @@ body.dragging-panel * {
   filter: brightness(1.12);
 }
 
-/* CSS proximity wave: item dưới con trỏ đi cao nhất, hai hàng xóm đi theo một nhịp nhỏ.
-   Không phát lại keyframe khi rê qua ranh giới icon nên chuyển động giữ được vận tốc. */
-@supports selector(.dock:has(> .dock-item:hover)) {
-  .dock:has(> .dock-item:hover) > .dock-item {
-    transform: translate3d(0, 1px, 0) scale(0.95);
-    filter: saturate(0.9) brightness(0.96);
-  }
-  .dock:has(> .dock-item:hover) > .dock-item:hover {
-    transform: translate3d(0, -8px, 0) scale(1.13);
-    filter: brightness(1.12);
-  }
-  .dock:has(> .dock-item:hover) > .dock-item:has(+ .dock-item:hover),
-  .dock:has(> .dock-item:hover) > .dock-item:hover + .dock-item {
-    transform: translate3d(0, -3px, 0) scale(1.035);
-    filter: brightness(1.04);
-  }
-  .dock:has(> .dock-item:active) > .dock-item:active {
-    transform: translate3d(0, -3px, 0) scale(0.92);
-  }
+/* Chỉ icon dưới con trỏ mới nhấc lên.
+   Bản trước lan hiệu ứng sang hai hàng xóm theo kiểu dock macOS: cả hàng khẽ chùng xuống,
+   hai icon cạnh con trỏ nhô theo. Ý đồ là một làn sóng, nhưng ở một dock chỉ vài icon sát
+   nhau thì nó đọc ra là "bấm nhầm cái nào cũng nhảy" — mắt không biết cái nào đang thật sự
+   được trỏ. Một icon động, phần còn lại đứng yên. */
+.dock-item:active {
+  transform: translate3d(0, -3px, 0) scale(0.92);
 }
-.dock-item:active { transform: translate3d(0, -3px, 0) scale(0.92); }
 
 .dock-tip {
   position: absolute;
@@ -1941,8 +2031,7 @@ body.dragging-panel * {
 .palette-backdrop {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--ui-background) 55%, transparent);
-  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--ui-scrim, #000) 58%, transparent);
   z-index: 1000;
   display: flex;
   justify-content: center;
@@ -2585,9 +2674,11 @@ body.dragging-panel * {
   min-width: 224px;
   padding: 5px;
   border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--ui-surface-container-high) 94%, transparent);
+  /* Menu nổi trên *nội dung panel*, không trên ảnh nền — nên không có ảnh mờ sẵn nào dùng
+     được ở đây, và làm mờ thật thì phải chạy lại theo từng khung hình của terminal bên dưới.
+     Material 3 vốn dựng menu bằng một surface đục; đó cũng là phương án rẻ nhất. */
+  background: var(--ui-surface-container-high);
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 45%, transparent);
-  backdrop-filter: blur(24px) saturate(140%);
   box-shadow: 0 12px 34px rgb(0 0 0 / 0.34);
   display: flex;
   flex-direction: column;

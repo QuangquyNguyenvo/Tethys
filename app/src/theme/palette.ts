@@ -283,6 +283,7 @@ const ROLES = [
   "onErrorContainer",
   "inverseSurface",
   "inverseOnSurface",
+  "scrim",
 ] as const;
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
@@ -361,9 +362,10 @@ export function terminalVars(s: DynamicScheme, o: ThemeOptions): Record<string, 
   const sel = MaterialDynamicColors.primary.getArgb(s);
 
   // Nền terminal *phải* đục theo `termOpacity`, còn lớp bên dưới nó là ảnh nền thật.
-  // `--term-backdrop` làm mờ ảnh nền đó: không mờ thì chữ nằm đè lên chi tiết ảnh và
-  // mất đọc. Đặc hẳn (1.0) thì trả về `none` — lớp lọc backdrop là thứ đắt nhất về GPU,
-  // giữ nó chạy khi chẳng thấy gì bên dưới là phí không (§7.7 điểm 3).
+  // Ảnh đó phải mờ, nếu không chữ nằm đè lên chi tiết ảnh và mất đọc — nhưng bản mờ đã
+  // được dựng sẵn một lần trong `useTheme.ts` và nằm ở `--wall-blur`, nên ở đây chỉ là
+  // chọn dùng nó hay không. Đặc hẳn (1.0) thì `none`: không vẽ một tấm ảnh mà người dùng
+  // không nhìn thấy một pixel nào (§7.7 điểm 3).
   // Bề mặt phẳng nghĩa là *đặc*, không có ngoại lệ: một terminal trong suốt giữa dàn panel
   // đục sẽ tố cáo ngay rằng "phẳng" chỉ là lớp sơn. Thanh Độ đục vì thế bị vô hiệu hoá ở
   // chế độ này (xem `SettingsModal`) thay vì im lặng không có tác dụng.
@@ -374,8 +376,7 @@ export function terminalVars(s: DynamicScheme, o: ThemeOptions): Record<string, 
   const out: Record<string, string> = {
     "--term-bg": hexWithAlpha(bg, opacity),
     "--term-opacity": String(opacity),
-    "--term-backdrop":
-      opacity >= 0.99 ? "none" : `blur(${Math.round((1 - opacity) * 22)}px) saturate(135%)`,
+    "--term-glass": opacity >= 0.99 ? "none" : "var(--wall-blur, none)",
     "--term-fg": hexFromArgb(fg),
     "--term-cursor": hexFromArgb(cursor),
     "--term-selection": hexFromArgb(sel),

@@ -6,6 +6,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced every `backdrop-filter` with a wallpaper that is blurred once when it is read.
+  The filter re-blurred a static image on every frame, and re-ran whenever the panel's own
+  content changed, so each line of terminal output blurred the whole panel.
+- Settings now uses Material Symbols with the `FILL` axis, so an option reads as on or off
+  by its shape rather than by colour alone. Icons no longer sit on tinted plates, the type
+  scale follows Material 3, and spacing within a group comes from one `gap`.
+- Softened the squash-and-stretch on settings controls and removed it from text chips.
+- The dock no longer lifts an icon's neighbours when one is hovered.
+- Widened the selected panel's accent border so it reads at a normal sitting distance.
+- Modal overlays use a Material 3 scrim instead of a full-screen blur.
+
+### Fixed
+
+- Settings' scroll bar was unstyled: the rule targeted `.set-content`, a class the component
+  had stopped rendering.
+- Long labels in the shortcut list were truncated mid-word instead of wrapping.
+
+### Removed
+
+- `Ctrl+Shift+Tab` for the next panel, replaced by `Ctrl+Tab`.
+
 ## [0.0.2] - 2026-08-26
 
 > Beta release for Windows 10 and Windows 11.

@@ -343,6 +343,14 @@ export default function App() {
           cycleWorkspace(step);
           return;
         }
+        // Ctrl+Tab sang panel kế tiếp. `stopPropagation` bắt buộc: chỉ `preventDefault`
+        // thì xterm vẫn nuốt phím và gửi một ký tự tab xuống shell sau khi đã chuyển panel.
+        if (e.code === "Tab") {
+          e.preventDefault();
+          e.stopPropagation();
+          move(1);
+          return;
+        }
       }
 
       // Alt+1…9 — nhảy thẳng tới workspace thứ n.
@@ -454,10 +462,6 @@ export default function App() {
         e.stopPropagation();
         const cur = useSessions.getState().focused;
         if (cur) remove(cur);
-      } else if (e.code === "Tab") {
-        e.preventDefault();
-        e.stopPropagation();
-        move(1);
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
@@ -500,7 +504,7 @@ export default function App() {
         id: "next_panel",
         title: "Go to next panel",
         category: "Layout",
-        shortcut: "Ctrl+Shift+Tab",
+        shortcut: "Ctrl+Tab",
         action: () => {
           move(1);
         },

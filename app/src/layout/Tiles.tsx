@@ -29,11 +29,18 @@ type WorkspaceTransition = {
   direction: 1 | -1;
 };
 
-const place = (r: Rect): React.CSSProperties => ({
-  transform: `translate(${r.x}px, ${r.y}px)`,
-  width: r.w,
-  height: r.h,
-});
+const place = (r: Rect): React.CSSProperties =>
+  ({
+    transform: `translate(${r.x}px, ${r.y}px)`,
+    width: r.w,
+    height: r.h,
+    // Lớp kính bên trong panel cần biết panel đang nằm ở đâu trên màn hình, để cắt đúng
+    // mảng ảnh nền của chỗ đó. `transform` không đọc được từ CSS, và chính nó lại làm
+    // `background-attachment: fixed` neo vào panel thay vì vào khung nhìn — nên toạ độ
+    // phải được nói ra một lần nữa dưới dạng biến.
+    "--px": `${r.x}px`,
+    "--py": `${r.y}px`,
+  }) as React.CSSProperties;
 
 /**
  * Canvas tiling.
