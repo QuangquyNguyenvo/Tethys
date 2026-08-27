@@ -177,10 +177,14 @@ export function Tiles({ theme }: Props) {
     // The timer deliberately survives ResizeObserver updates while the transition runs.
     // Tying it to this effect's cleanup used to leave the old workspace permanently visible
     // when the window changed size during the animation.
+    //
+    // Phải dài hơn panel vào *cuối cùng*, tức là 480ms của animation cộng bậc thang lớn
+    // nhất (6 × 26ms). Hết giờ sớm thì `workspaceTransition` bị xoá giữa chừng, class
+    // `entering-*` rơi khỏi phần tử, và panel nhảy phắt về vị trí cuối.
     workspaceTimerRef.current = window.setTimeout(() => {
       workspaceTimerRef.current = null;
       setWorkspaceTransition(null);
-    }, 620);
+    }, 700);
   }, [activeWorkspaceId, workspaces, box.w, box.h]);
 
   // Bóng panel vừa đóng.

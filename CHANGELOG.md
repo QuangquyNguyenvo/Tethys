@@ -11,6 +11,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Panels now interpolate their size as well as their position when the layout changes.
   Splitting used to slide a panel to its new place while snapping it to its new width in
   the same instant, so one movement ran at two speeds. The divider travels with them.
+- Switching workspaces is now a proper shared-axis slide: the outgoing workspace leaves in
+  240ms on an accelerating curve while the incoming one arrives over 480ms on a decelerating
+  one. Both used to take 440ms on the same curve, so for most of the switch two workspaces
+  sat on screen at half opacity. Neither scales any more.
 - Panel travel no longer overshoots. A 12% overshoot reads as a bounce on a 32px chip and
   as a wobble on a 700px terminal; large surfaces use M3 emphasized easing instead.
 - Replaced every `backdrop-filter` with a wallpaper that is blurred once when it is read.

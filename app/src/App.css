@@ -562,56 +562,81 @@ body.resizing-window .gutter,
 }
 /* Workspace cards move on a layer of their own. No width/height, filter, or blur is
    animated here: keeping those fixed is what makes the switch feel immediate even with
-   several live xterm canvases. */
+   several live xterm canvases.
+
+   Đây là "shared axis X" của Material: hai workspace nằm cạnh nhau trên một trục ngang,
+   nên đổi tab là trượt ngang, không phải mờ tại chỗ.
+
+   Ba điều quyết định nó mượt hay không:
+
+   1. **Đi ra nhanh hơn đi vào.** Bản trước cho cả hai 440ms, nên suốt gần nửa giây có hai
+      workspace cùng hiện ở nửa độ đục — mắt không biết nhìn cái nào, và cái đó đọc ra là
+      nhoè chứ không phải chuyển cảnh. Thứ sắp biến mất không đáng được nhìn lâu.
+   2. **Hai đường cong khác nhau.** Cái đi ra tăng tốc rồi mất hút (accelerate); cái đi vào
+      lao tới rồi hãm dần (decelerate). Dùng chung một đường cong thì cả hai đều đứng lại ở
+      giữa quãng đường cùng một lúc.
+   3. **Không scale.** Trục X thì trượt theo trục X. Thu nhỏ thêm 1,8% chẳng ai thấy là
+      chiều sâu, chỉ thấy chữ hơi nhoè trong lúc động. */
 .panel-host.workspace-leaving { z-index: 4; pointer-events: none; }
 .workspace-motion.entering-right,
 .workspace-motion.entering-left,
 .workspace-motion.leaving-right,
 .workspace-motion.leaving-left {
   will-change: transform, opacity;
-  animation-duration: 440ms;
-  animation-timing-function: var(--e-spring-soft);
   animation-fill-mode: both;
-  animation-delay: calc(var(--workspace-order) * 18ms);
+}
+.workspace-motion.entering-right,
+.workspace-motion.entering-left {
+  animation-duration: 480ms;
+  animation-timing-function: var(--e-decelerate);
+  /* Các panel vào lệch nhau một nhịp nhỏ, nên workspace mới trải ra chứ không bật lên
+     nguyên khối. `Tiles.tsx` chặn bậc thang ở 6 để một workspace nhiều panel không kéo
+     dài chuyển cảnh thành một giây. */
+  animation-delay: calc(var(--workspace-order) * 26ms);
+}
+.workspace-motion.leaving-right,
+.workspace-motion.leaving-left {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.3, 0, 0.8, 0.15);
 }
 .workspace-motion.entering-right { animation-name: workspace-enter-right; }
 .workspace-motion.entering-left { animation-name: workspace-enter-left; }
 .workspace-motion.leaving-right { animation-name: workspace-leave-right; }
 .workspace-motion.leaving-left { animation-name: workspace-leave-left; }
 @keyframes workspace-enter-right {
-  from { opacity: 0; transform: translate3d(clamp(32px, 6vw, 72px), 0, 0) scale(0.982); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  from { opacity: 0; transform: translate3d(clamp(36px, 6vw, 80px), 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes workspace-enter-left {
-  from { opacity: 0; transform: translate3d(clamp(-72px, -6vw, -32px), 0, 0) scale(0.982); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  from { opacity: 0; transform: translate3d(clamp(-80px, -6vw, -36px), 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes workspace-leave-right {
-  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to { opacity: 0; transform: translate3d(clamp(24px, 4vw, 56px), 0, 0) scale(0.988); }
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(clamp(28px, 5vw, 64px), 0, 0); }
 }
 @keyframes workspace-leave-left {
-  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to { opacity: 0; transform: translate3d(clamp(-56px, -4vw, -24px), 0, 0) scale(0.988); }
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(clamp(-64px, -5vw, -28px), 0, 0); }
 }
 
 /* Terminal glyph atlases stay pixel-sharp: workspace travel may translate/fade them but
    never scale the WebGL canvas. Expressive overshoot is reserved for smaller UI surfaces. */
 @keyframes terminal-workspace-enter-right {
-  from { opacity: 0; transform: translate3d(clamp(32px, 6vw, 72px), 0, 0); }
+  from { opacity: 0; transform: translate3d(clamp(36px, 6vw, 80px), 0, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes terminal-workspace-enter-left {
-  from { opacity: 0; transform: translate3d(clamp(-72px, -6vw, -32px), 0, 0); }
+  from { opacity: 0; transform: translate3d(clamp(-80px, -6vw, -36px), 0, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes terminal-workspace-leave-right {
   from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to { opacity: 0; transform: translate3d(clamp(24px, 4vw, 56px), 0, 0); }
+  to { opacity: 0; transform: translate3d(clamp(28px, 5vw, 64px), 0, 0); }
 }
 @keyframes terminal-workspace-leave-left {
   from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to { opacity: 0; transform: translate3d(clamp(-56px, -4vw, -24px), 0, 0); }
+  to { opacity: 0; transform: translate3d(clamp(-64px, -5vw, -28px), 0, 0); }
 }
 .panel-host[data-panel-type="terminal"] .workspace-motion.entering-right { animation-name: terminal-workspace-enter-right; }
 .panel-host[data-panel-type="terminal"] .workspace-motion.entering-left { animation-name: terminal-workspace-enter-left; }
