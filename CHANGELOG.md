@@ -28,6 +28,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Made terminal selections clearly visible in both active and inactive panels.
+- Reloading with F5 now refreshes only the focused embedded web panel instead of restarting Tethys.
+- Fixed the dock auto-hide edge trigger so hovering at the bottom reliably reveals the dock.
+- Routed F11 through the native app window so fullscreen covers the complete monitor rather than being consumed by embedded content.
+- Explicitly disabled WebView2 DevTools and its F12 shortcut in release builds.
 - Prevented double-clicks on workspace tabs from accidentally maximizing the window.
 - Restored colored `ls` and `dir` output when Tethys falls back to Windows PowerShell 5.1.
 - Fixed unsupported README glyphs and malformed markup.

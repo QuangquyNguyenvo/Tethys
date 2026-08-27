@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRightToLine,
   Blend,
@@ -99,6 +99,41 @@ export function SettingsModal({ onClose }: Props) {
   const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [updateInfo, setUpdateInfo] = useState<Update | null>(null);
   const [updateError, setUpdateError] = useState("");
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
+  const closeTimer = useRef<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(
+    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
+
+  const requestClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onClose();
+      return;
+    }
+
+    setClosing(true);
+    backdropRef.current?.focus({ preventScroll: true });
+    closeTimer.current = window.setTimeout(onClose, 220);
+  }, [onClose]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      dialogRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+      const returnTarget = returnFocusRef.current;
+      if (returnTarget?.isConnected) returnTarget.focus({ preventScroll: true });
+    };
+  }, []);
 
   useEffect(() => {
     const path = opts.sysfetchLogoPath;
@@ -125,12 +160,20 @@ export function SettingsModal({ onClose }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        requestClose();
+      } else if (e.key === "Tab") {
+        if (closingRef.current) {
+          e.preventDefault();
+          return;
+        }
+
+        const dialog = dialogRef.current;
+        if (dialog) trapFocus(e, dialog);
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [onClose]);
+  }, [requestClose]);
 
   const handleCheckForUpdate = async () => {
     if (updateState === "checking" || updateState === "downloading") return;
@@ -163,8 +206,23 @@ export function SettingsModal({ onClose }: Props) {
   const active = PAGES.find((p) => p.id === page) ?? PAGES[0];
 
   return (
-    <div className="settings-backdrop" onClick={onClose}>
-      <div className="settings-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
+    <div
+      ref={backdropRef}
+      className={"settings-backdrop" + (closing ? " is-closing" : "")}
+      onClick={requestClose}
+      tabIndex={-1}
+    >
+      <div
+        ref={dialogRef}
+        className="settings-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        aria-hidden={closing || undefined}
+        inert={closing}
+        tabIndex={-1}
+      >
         <aside className="set-rail">
           <img src="/logo.png" alt="" className="set-rail-logo" draggable={false} />
           <nav className="set-rail-nav">
@@ -185,11 +243,11 @@ export function SettingsModal({ onClose }: Props) {
 
         <div className="set-body">
           <header className="set-head">
-            <div>
+            <div key={page} className="set-title">
               <h2>{active.label}</h2>
               <p>{active.blurb}</p>
             </div>
-            <button className="set-close" onClick={onClose} title="Close (Esc)" aria-label="Close settings">
+            <button className="set-close" onClick={requestClose} title="Close (Esc)" aria-label="Close settings">
               <X size={16} />
             </button>
           </header>
@@ -413,6 +471,45 @@ export function SettingsModal({ onClose }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+function trapFocus(event: KeyboardEvent, dialog: HTMLElement) {
+  const focusable = getFocusableElements(dialog);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    dialog.focus({ preventScroll: true });
+    return;
+  }
+
+  const activeIndex = focusable.indexOf(document.activeElement as HTMLElement);
+  const atStart = activeIndex <= 0;
+  const atEnd = activeIndex === focusable.length - 1;
+
+  if (event.shiftKey && atStart) {
+    event.preventDefault();
+    focusable[focusable.length - 1].focus({ preventScroll: true });
+  } else if (!event.shiftKey && (activeIndex === -1 || atEnd)) {
+    event.preventDefault();
+    focusable[0].focus({ preventScroll: true });
+  }
+}
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  const selector = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(",");
+
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter((element) =>
+    !element.hidden &&
+    element.getAttribute("aria-hidden") !== "true" &&
+    !element.closest('[hidden], [aria-hidden="true"]') &&
+    element.getClientRects().length > 0
   );
 }
 

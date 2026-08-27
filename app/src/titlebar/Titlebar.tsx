@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -47,8 +47,9 @@ function iconFor(id: string) {
  * nằm giữa *thanh*; với flex nó chỉ nằm giữa *khoảng trống còn lại*, tức là lệch đúng bằng
  * hiệu bề ngang hai cụm hai bên — và cụm phải luôn rộng hơn cụm trái.
  *
- * Tab đang chọn đánh dấu bằng gạch chân accent, không phải nền pill đặc. Nền đặc kéo con mắt
- * mạnh hơn hẳn mọi thứ khác trên thanh, trong khi đây là thứ người dùng liếc chứ không nhìn.
+ * Tab đang chọn dùng một tonal pill duy nhất trượt giữa các workspace. Indicator nằm trên
+ * compositor layer riêng nên đổi tab chỉ animate transform/width của chrome nhỏ, không làm
+ * các terminal bên dưới reflow theo từng frame.
  *
  * Đã bỏ hai thứ vô dụng của bản trước:
  * — "3AM — Aesthetic" cùng mấy vạch nhạc nhấp nháy: một trình phát nhạc giả, không nối
@@ -88,6 +89,36 @@ export function Titlebar({
   }, []);
 
   const icons = useMemo(() => tabs.map((t) => iconFor(t.id)), [tabs]);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef(new Map<string, HTMLDivElement>());
+  const [activePill, setActivePill] = useState({ x: 0, width: 0, ready: false });
+
+  // The active workspace is represented by one shared pill instead of one background per
+  // tab. Moving the same surface is the Material motion equivalent of shape morphing and
+  // avoids a cross-fade that would make the bar flash on every workspace switch.
+  useLayoutEffect(() => {
+    const bar = tabBarRef.current;
+    const active = tabRefs.current.get(activeTab);
+    if (!bar || !active) {
+      setActivePill((current) => current.ready ? { ...current, ready: false } : current);
+      return;
+    }
+
+    const measure = () => {
+      const next = { x: active.offsetLeft, width: active.offsetWidth, ready: true };
+      setActivePill((current) =>
+        current.x === next.x && current.width === next.width && current.ready
+          ? current
+          : next,
+      );
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    observer.observe(active);
+    return () => observer.disconnect();
+  }, [activeTab, tabs]);
   const handleMinimize = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     invoke("app_window_minimize").catch(() => {
@@ -161,13 +192,28 @@ export function Titlebar({
           data-tauri-drag-region
           onDoubleClick={handleChromeDoubleClick}
         >
-          <div className="tab-bar" role="tablist" data-tauri-drag-region>
+          <div ref={tabBarRef} className="tab-bar" role="tablist" data-tauri-drag-region>
+            <span
+              className="tab-active-indicator"
+              aria-hidden="true"
+              style={
+                {
+                  "--tab-x": `${activePill.x}px`,
+                  "--tab-width": `${activePill.width}px`,
+                  opacity: activePill.ready ? 1 : 0,
+                } as CSSProperties
+              }
+            />
             {tabs.map((t, idx) => {
               const Icon = icons[idx];
               const active = t.id === activeTab;
               return (
                 <div
                   key={t.id}
+                  ref={(node) => {
+                    if (node) tabRefs.current.set(t.id, node);
+                    else tabRefs.current.delete(t.id);
+                  }}
                   role="tab"
                   aria-selected={active}
                   className={`tab-item ${active ? "active" : ""}`}

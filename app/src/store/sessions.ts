@@ -129,7 +129,7 @@ type SessionStore = {
   // Workspaces actions
   switchWorkspace: (id: string) => void;
   cycleWorkspace: (step: -1 | 1) => void;
-  addWorkspace: (name?: string) => string;
+  addWorkspace: (name?: string, initialPanel?: Omit<Panel, "key">) => string;
   removeWorkspace: (id: string) => void;
   renameWorkspace: (id: string, name: string) => void;
 };
@@ -471,12 +471,13 @@ export const useSessions = create<SessionStore>((set, get) => ({
     get().switchWorkspace(workspaces[targetIndex].id);
   },
 
-  addWorkspace: (name) => {
+  addWorkspace: (name, initialPanel) => {
     const { workspaces, activeWorkspaceId, tree, panels, focused } = get();
     const id = `ws_${Date.now()}`;
     const wsName = name || `Workspace ${workspaces.length + 1}`;
     const newKey = nextKey();
-    const newPanel: Panel = { key: newKey, type: "terminal" };
+    const panelType = initialPanel?.type ?? (initialPanel?.path ? "preview" : "terminal");
+    const newPanel: Panel = { key: newKey, ...initialPanel, type: panelType };
     const newTree = leaf(newKey);
 
     const updated = workspaces.map((w) =>

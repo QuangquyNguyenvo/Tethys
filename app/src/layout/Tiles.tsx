@@ -112,7 +112,11 @@ export function Tiles({ theme }: Props) {
   // Keep both layouts at their real dimensions and animate only a visual wrapper. Terminals
   // therefore never refit on every animation frame while switching workspaces.
   const previousWorkspaceId = useRef(activeWorkspaceId);
+  const workspaceTimerRef = useRef<number | null>(null);
   const [workspaceTransition, setWorkspaceTransition] = useState<WorkspaceTransition | null>(null);
+  useEffect(() => () => {
+    if (workspaceTimerRef.current !== null) window.clearTimeout(workspaceTimerRef.current);
+  }, []);
   useLayoutEffect(() => {
     const previousId = previousWorkspaceId.current;
     if (previousId === activeWorkspaceId) return;
@@ -122,7 +126,17 @@ export function Tiles({ theme }: Props) {
     const previous = workspaces[previousIndex];
     previousWorkspaceId.current = activeWorkspaceId;
 
-    if (!previous || box.w <= 0 || box.h <= 0) {
+    if (workspaceTimerRef.current !== null) {
+      window.clearTimeout(workspaceTimerRef.current);
+      workspaceTimerRef.current = null;
+    }
+
+    if (
+      !previous ||
+      box.w <= 0 ||
+      box.h <= 0 ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
       setWorkspaceTransition(null);
       return;
     }
@@ -132,8 +146,13 @@ export function Tiles({ theme }: Props) {
       layout: computeLayout(previous.tree, { x: 0, y: 0, w: box.w, h: box.h }),
       direction: nextIndex > previousIndex ? 1 : -1,
     });
-    const timer = window.setTimeout(() => setWorkspaceTransition(null), 520);
-    return () => window.clearTimeout(timer);
+    // The timer deliberately survives ResizeObserver updates while the transition runs.
+    // Tying it to this effect's cleanup used to leave the old workspace permanently visible
+    // when the window changed size during the animation.
+    workspaceTimerRef.current = window.setTimeout(() => {
+      workspaceTimerRef.current = null;
+      setWorkspaceTransition(null);
+    }, 620);
   }, [activeWorkspaceId, workspaces, box.w, box.h]);
 
   // Bóng panel vừa đóng.
@@ -184,7 +203,7 @@ export function Tiles({ theme }: Props) {
               visible={visible}
               theme={theme}
               workspaceMotion={workspaceMotion}
-              workspaceOrder={Math.max(0, workspaceOrder)}
+              workspaceOrder={Math.min(6, Math.max(0, workspaceOrder))}
             />
           );
         })}
@@ -228,6 +247,7 @@ function PanelHost({
 }) {
   const previousRect = useRef<Rect | null>(null);
   const frameRef = useRef<number | null>(null);
+  const motionTimerRef = useRef<number | null>(null);
   const [motionOffset, setMotionOffset] = useState<{ x: number; y: number } | null>(null);
   const [motionArmed, setMotionArmed] = useState(false);
   const focused = useSessions((s) => s.focused === panel.key);
@@ -239,6 +259,10 @@ function PanelHost({
   const isTerminal = panel.type === undefined || panel.type === "terminal";
   const shouldRenderPanel = visible || isTerminal;
 
+  useEffect(() => () => {
+    if (motionTimerRef.current !== null) window.clearTimeout(motionTimerRef.current);
+  }, []);
+
   // Fallback FLIP luôn hoạt động trên WebView2: parent nhận hình học mới một lần, còn
   // lớp visual bên trong bắt đầu tại toạ độ cũ rồi translate về vị trí thật. Không scale
   // canvas chữ của xterm và không động tới backdrop-filter, nên blur giữ nguyên.
@@ -248,17 +272,31 @@ function PanelHost({
     if (workspaceMotion || !previous || !visible || (previous.x === rect.x && previous.y === rect.y)) return;
 
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    if (motionTimerRef.current !== null) window.clearTimeout(motionTimerRef.current);
     setMotionArmed(false);
     setMotionOffset({ x: previous.x - rect.x, y: previous.y - rect.y });
     frameRef.current = requestAnimationFrame(() => {
       setMotionArmed(true);
       setMotionOffset(null);
       frameRef.current = null;
+      motionTimerRef.current = window.setTimeout(() => {
+        motionTimerRef.current = null;
+        setMotionArmed(false);
+      }, 560);
     });
     return () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     };
   }, [rect.x, rect.y, rect.w, rect.h, visible, workspaceMotion]);
+
+  const finishPanelMotion = useCallback((e: React.TransitionEvent<HTMLDivElement>) => {
+    if (e.currentTarget !== e.target || e.propertyName !== "transform") return;
+    if (motionTimerRef.current !== null) {
+      window.clearTimeout(motionTimerRef.current);
+      motionTimerRef.current = null;
+    }
+    setMotionArmed(false);
+  }, []);
 
   return (
     <div
@@ -282,6 +320,7 @@ function PanelHost({
       <div
         className={"panel-motion" + (motionArmed ? " is-moving" : "")}
         style={motionOffset ? { transform: `translate3d(${motionOffset.x}px, ${motionOffset.y}px, 0)` } : undefined}
+        onTransitionEnd={finishPanelMotion}
       >
         <Suspense fallback={<div className="panel-loading" aria-label="Loading panel" />}>
           {shouldRenderPanel && (panel.type === "preview" && panel.path ? (
@@ -316,11 +355,16 @@ function PanelHost({
 function Gutter({ info }: { info: GutterInfo }) {
   const resize = useSessions((s) => s.resize);
   const [active, setActive] = useState(false);
+  const resizeCleanupRef = useRef<((updateMountedState?: boolean) => void) | null>(null);
+
+  useEffect(() => () => resizeCleanupRef.current?.(false), []);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0) return;
       e.preventDefault();
+      resizeCleanupRef.current?.(true);
+
       const el = e.currentTarget;
       const pointerId = e.pointerId;
       const host = el.parentElement?.getBoundingClientRect();
@@ -328,6 +372,8 @@ function Gutter({ info }: { info: GutterInfo }) {
 
       let pendingRatio: number | null = null;
       let frame: number | null = null;
+      let finished = false;
+      let sessionCleanup: ((updateMountedState?: boolean) => void) | null = null;
       const commitRatio = () => {
         frame = null;
         if (pendingRatio === null) return;
@@ -345,6 +391,7 @@ function Gutter({ info }: { info: GutterInfo }) {
       document.body.classList.add("resizing-layout");
 
       const onMove = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
         const r =
           info.dir === "row"
             ? (ev.clientX - host.left - info.parent.x) / info.parent.w
@@ -353,12 +400,15 @@ function Gutter({ info }: { info: GutterInfo }) {
         // per display frame is visually identical and avoids duplicate terminal reflows.
         scheduleRatio(r);
       };
-      const onUp = () => {
+
+      const finish = (commitPending: boolean, updateMountedState: boolean) => {
+        if (finished) return;
+        finished = true;
         el.removeEventListener("pointermove", onMove);
         el.removeEventListener("pointerup", onUp);
-        el.removeEventListener("pointercancel", onUp);
+        el.removeEventListener("pointercancel", onCancel);
         try {
-          el.releasePointerCapture(pointerId);
+          if (el.hasPointerCapture(pointerId)) el.releasePointerCapture(pointerId);
         } catch {
           /* đã nhả rồi */
         }
@@ -366,14 +416,25 @@ function Gutter({ info }: { info: GutterInfo }) {
           cancelAnimationFrame(frame);
           frame = null;
         }
-        // Preserve the exact final position, even when it arrives just after a frame.
-        if (pendingRatio !== null) resize(info.path, pendingRatio);
-        setActive(false);
+        if (commitPending && pendingRatio !== null) resize(info.path, pendingRatio);
+        pendingRatio = null;
+        if (updateMountedState) setActive(false);
         document.body.classList.remove("resizing-layout");
+        if (resizeCleanupRef.current === sessionCleanup) resizeCleanupRef.current = null;
       };
+
+      const onUp = (ev: PointerEvent) => {
+        if (ev.pointerId === pointerId) finish(true, true);
+      };
+      const onCancel = (ev: PointerEvent) => {
+        if (ev.pointerId === pointerId) finish(false, true);
+      };
+
+      sessionCleanup = (updateMountedState = true) => finish(false, updateMountedState);
+      resizeCleanupRef.current = sessionCleanup;
       el.addEventListener("pointermove", onMove);
       el.addEventListener("pointerup", onUp);
-      el.addEventListener("pointercancel", onUp);
+      el.addEventListener("pointercancel", onCancel);
     },
     [info.dir, info.parent.x, info.parent.y, info.parent.w, info.parent.h, info.path, resize],
   );
@@ -436,7 +497,7 @@ function DropOverlay({ box, layout }: { box: Rect; layout: Layout }) {
           <span className="drop-badge">{label}</span>
         </div>
       )}
-      <div className="drag-ghost" style={{ transform: `translate(${drag.x}px, ${drag.y}px)` }}>
+      <div className="drag-ghost" style={{ transform: `translate3d(${drag.x}px, ${drag.y}px, 0)` }}>
         <span className="drag-ghost-dot" />
         <span>moving panel</span>
       </div>

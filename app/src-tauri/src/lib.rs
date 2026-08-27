@@ -178,6 +178,80 @@ fn set_webview_memory_target(window: &tauri::Window, low: bool) {
     });
 }
 
+/// Chặn các browser accelerator mà WebView2 xử lý trước DOM. Nếu chỉ nghe `keydown`
+/// trong React thì F5/F11 vẫn lọt khi focus nằm trong iframe khác origin, còn F12 có thể
+/// mở inspector trước khi frontend kịp huỷ sự kiện.
+#[cfg(target_os = "windows")]
+fn install_webview_shortcuts(window: &tauri::WebviewWindow) {
+    use tauri::Emitter;
+    use webview2_com::AcceleratorKeyPressedEventHandler;
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN, COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN,
+        COREWEBVIEW2_PHYSICAL_KEY_STATUS,
+    };
+
+    let event_window = window.clone();
+    let _ = window.with_webview(move |platform| {
+        let controller = platform.controller();
+
+        // Wry already defaults this to false in release builds. Set it explicitly here so
+        // a future feature/config change cannot accidentally expose production DevTools.
+        #[cfg(not(debug_assertions))]
+        if let Ok(core) = unsafe { controller.CoreWebView2() } {
+            if let Ok(settings) = unsafe { core.Settings() } {
+                let _ = unsafe { settings.SetAreDevToolsEnabled(false) };
+            }
+        }
+
+        let handler = AcceleratorKeyPressedEventHandler::create(Box::new(move |_sender, args| {
+            let Some(args) = args else {
+                return Ok(());
+            };
+
+            let mut kind = COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN;
+            unsafe { args.KeyEventKind(&mut kind)? };
+            if kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN
+                && kind != COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN
+            {
+                return Ok(());
+            }
+
+            let mut status = COREWEBVIEW2_PHYSICAL_KEY_STATUS::default();
+            unsafe { args.PhysicalKeyStatus(&mut status)? };
+            if status.WasKeyDown.as_bool() {
+                return Ok(());
+            }
+
+            let mut key = 0_u32;
+            unsafe { args.VirtualKey(&mut key)? };
+            let action = match key {
+                0x74 => Some("reload-web"),        // VK_F5
+                0x7A => Some("toggle-fullscreen"), // VK_F11
+                _ => None,
+            };
+
+            if let Some(action) = action {
+                unsafe { args.SetHandled(true)? };
+                let _ = event_window.emit("app-shortcut", action);
+                return Ok(());
+            }
+
+            // Debug builds keep F12 available to developers. The shipped executable both
+            // disables DevTools above and consumes the accelerator itself as defence-in-depth.
+            #[cfg(not(debug_assertions))]
+            if key == 0x7B {
+                // VK_F12
+                unsafe { args.SetHandled(true)? };
+            }
+
+            Ok(())
+        }));
+
+        let mut token = 0;
+        let _ = unsafe { controller.add_AcceleratorKeyPressed(&handler, &mut token) };
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -185,7 +259,6 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(PtyManager::default())
         .manage(WatcherManager::default())
-        .manage(window_cmd::WindowState::default())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -194,6 +267,7 @@ pub fn run() {
             if let Some(win) = app.get_webview_window("main") {
                 #[cfg(target_os = "windows")]
                 {
+                    install_webview_shortcuts(&win);
                     // Áp dụng Acrylic blur / Mica cho Windows 11/10
                     if let Err(_) = window_vibrancy::apply_acrylic(&win, Some((16, 18, 24, 120))) {
                         let _ = window_vibrancy::apply_mica(&win, Some(true));
@@ -253,7 +327,7 @@ pub fn run() {
             window_cmd::app_window_toggle_maximize,
             window_cmd::app_window_is_maximized,
             window_cmd::app_window_close,
-            window_cmd::app_window_toggle_fullscreen,
+            window_cmd::app_window_set_fullscreen,
             window_cmd::app_window_system_menu,
             app_window_set_vibrancy
         ])

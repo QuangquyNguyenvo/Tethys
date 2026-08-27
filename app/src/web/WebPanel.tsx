@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Globe, Search } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useSessions } from "../store/sessions";
 import { PanelHeader, type HeadAction } from "../panel/PanelHeader";
 
@@ -35,12 +36,46 @@ const QUICK = [
  */
 export function WebPanel({ panelKey, url }: Props) {
   const updatePanel = useSessions((s) => s.updatePanel);
+  const focusPanel = useSessions((s) => s.focus);
   const [input, setInput] = useState(url ?? "");
   const [nonce, setNonce] = useState(0);
   const history = useRef<string[]>(url ? [url] : []);
   const cursor = useRef(url ? 0 : -1);
 
   const current = url ?? "";
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let disposed = false;
+
+    // WebView2 bắt F5 ở tầng native trước cả document, đặc biệt khi focus nằm trong
+    // iframe khác origin. Backend chặn việc reload nguyên Tethys rồi phát tín hiệu này;
+    // chỉ panel web đang được chọn mới nạp lại iframe của chính nó.
+    listen<string>("app-shortcut", (event) => {
+      if (
+        event.payload === "reload-web" &&
+        useSessions.getState().focused === panelKey
+      ) {
+        setNonce((n) => n + 1);
+      }
+    })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
+
+    const onFallbackReload = () => {
+      if (useSessions.getState().focused === panelKey) setNonce((n) => n + 1);
+    };
+    window.addEventListener("tethys:web-reload", onFallbackReload);
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+      window.removeEventListener("tethys:web-reload", onFallbackReload);
+    };
+  }, [panelKey]);
 
   const openExternal = (target = current || normalize(input) || "https://duckduckgo.com/") => {
     invoke("fs_open_external", { path: target }).catch(() => {});
@@ -140,6 +175,7 @@ export function WebPanel({ panelKey, url }: Props) {
             key={current + "#" + nonce}
             src={current}
             title="web"
+            onFocus={() => focusPanel(panelKey)}
             referrerPolicy="no-referrer"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           />

@@ -1,9 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { Tiles } from "./layout/Tiles";
-import { useSessions, type PanelType } from "./store/sessions";
+import { useSessions, type PanelType, type Workspace } from "./store/sessions";
 import { useTheme, useThemeStore } from "./theme/useTheme";
 import { TERM_OPACITY_MAX, TERM_OPACITY_MIN } from "./theme/palette";
 import { CommandPalette } from "./palette/CommandPalette";
@@ -15,6 +16,9 @@ import { Folder, Globe, MonitorCog, Settings, Terminal } from "lucide-react";
 // Popup phụ trợ, không phải màn hình mặc định — nạp khi cần giống mọi panel khác trong Tiles.
 const SettingsModal = lazy(() => import("./settings/SettingsModal").then(({ SettingsModal }) => ({ default: SettingsModal })));
 import "./App.css";
+
+const WINDOWS_NATIVE_FKEYS =
+  "__TAURI_INTERNALS__" in window && navigator.userAgent.includes("Windows");
 
 export default function App() {
   const { xterm, source, wallpaper, opts, setOpts, refresh } = useTheme();
@@ -40,14 +44,54 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenState = useRef(false);
+  const fullscreenTogglePending = useRef(false);
 
-  const toggleFullscreen = useCallback(() => {
-    invoke<boolean>("app_window_toggle_fullscreen")
-      .then(setIsFullscreen)
+  const setFullscreen = useCallback((fullscreen: boolean) => {
+    // WebView2 có thể phát cả accelerator native lẫn DOM keydown cho cùng một lần bấm.
+    // Gửi trạng thái đích thay vì lệnh "toggle": nếu một sự kiện lọt qua hai đường thì
+    // cả hai vẫn cùng yêu cầu một kết quả, không thể bật rồi tắt cửa sổ ngay lập tức.
+    if (fullscreenTogglePending.current) return;
+    fullscreenTogglePending.current = true;
+    invoke<boolean>("app_window_set_fullscreen", { fullscreen })
+      .then((actual) => {
+        fullscreenState.current = actual;
+        setIsFullscreen(actual);
+      })
       .catch((error) => {
-        invoke("frontend_error", { message: `fullscreen toggle failed: ${String(error)}` }).catch(() => {});
+        invoke("frontend_error", { message: `fullscreen change failed: ${String(error)}` }).catch(() => {});
+      })
+      .finally(() => {
+        window.setTimeout(() => {
+          fullscreenTogglePending.current = false;
+        }, 180);
       });
   }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    setFullscreen(!fullscreenState.current);
+  }, [setFullscreen]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let disposed = false;
+
+    // F11 là browser accelerator của WebView2 nên keydown trong document không đáng tin
+    // khi focus đang ở iframe/xterm. Backend giữ phím ở tầng native rồi chuyển về đây.
+    listen<string>("app-shortcut", (event) => {
+      if (event.payload === "toggle-fullscreen") toggleFullscreen();
+    })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [toggleFullscreen]);
   // CSS controls the webview only; the actual Acrylic/Mica surface belongs to Windows.
   useEffect(() => {
     invoke("app_window_set_vibrancy", { enabled: opts.windowVibrancy !== false }).catch(() => {});
@@ -62,8 +106,24 @@ export default function App() {
     // để designer soi chrome. Settings giờ là popup, không còn là panel — mở nó song song
     // là cách designer vẫn kiểm được toàn bộ chrome của nó.
     if (!("__TAURI_INTERNALS__" in window)) {
-      const key = "preview-settings";
-      restore({ kind: "leaf", key }, [{ key, type: "explorer" }], key);
+      const previewWorkspaces: Workspace[] = [
+        {
+          id: "preview-workspace-1",
+          name: "Workspace 1",
+          tree: { kind: "leaf", key: "preview-explorer-1" },
+          panels: [{ key: "preview-explorer-1", type: "explorer" }],
+          focused: "preview-explorer-1",
+        },
+        {
+          id: "preview-workspace-2",
+          name: "Motion Lab",
+          tree: { kind: "leaf", key: "preview-explorer-2" },
+          panels: [{ key: "preview-explorer-2", type: "explorer" }],
+          focused: "preview-explorer-2",
+        },
+      ];
+      const active = previewWorkspaces[0];
+      restore(active.tree, active.panels, active.focused, previewWorkspaces, active.id);
       setSettingsOpen(true);
       setHydrated();
       return;
@@ -231,9 +291,28 @@ export default function App() {
   // Phím tắt toàn cục: Command Palette và Layout navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Fallback cho browser preview và nền tảng không dùng WebView2. Trên Windows bản
+      // desktop, native handler sẽ đánh dấu F5 đã xử lý trước khi nó tới document.
+      if (e.key === "F5") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!WINDOWS_NATIVE_FKEYS) {
+          window.dispatchEvent(new Event("tethys:web-reload"));
+        }
+        return;
+      }
+
       // A real native fullscreen, so Windows chrome is gone as well. Capture phase keeps
       // both shortcuts available while focus is inside the xterm canvas.
-      if (e.key === "F11" || (e.altKey && !e.ctrlKey && !e.shiftKey && e.code === "Enter")) {
+      if (e.key === "F11") {
+        e.preventDefault();
+        e.stopPropagation();
+        // Windows desktop đi duy nhất qua AcceleratorKeyPressed. DOM chỉ huỷ browser
+        // default; gọi IPC thêm lần nữa ở đây chính là nguyên nhân bật rồi tắt ngay.
+        if (!WINDOWS_NATIVE_FKEYS) toggleFullscreen();
+        return;
+      }
+      if (e.altKey && !e.ctrlKey && !e.shiftKey && e.code === "Enter") {
         e.preventDefault();
         e.stopPropagation();
         toggleFullscreen();
@@ -719,7 +798,12 @@ export default function App() {
         tabs={workspaces}
         activeTab={activeWorkspaceId}
         onSelectTab={switchWorkspace}
-        onAddTab={() => addWorkspace()}
+        onAddTab={() =>
+          addWorkspace(
+            undefined,
+            "__TAURI_INTERNALS__" in window ? undefined : { type: "explorer" },
+          )
+        }
         onCloseTab={removeWorkspace}
       />
 

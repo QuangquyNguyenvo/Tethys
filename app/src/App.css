@@ -15,6 +15,11 @@ body {
   overflow: hidden;
 }
 
+:where(button, [role="tab"], input, [role="separator"]):focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 2px;
+}
+
 :root {
   /* Motion M3 expressive */
   --e-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
@@ -22,6 +27,11 @@ body {
   --e-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1.0);
   --e-bounce: cubic-bezier(0.16, 1, 0.3, 1);
   --e-window: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-spring: cubic-bezier(0.34, 1.38, 0.64, 1);
+  --e-spring-soft: cubic-bezier(0.22, 1.12, 0.36, 1);
+  --motion-fast: 140ms;
+  --motion-medium: 280ms;
+  --motion-slow: 460ms;
 
   /* Shape scale M3 */
   --r-xs: 6px;
@@ -29,6 +39,7 @@ body {
   --r-md: 13px;
   --r-lg: 17px;
   --r-xl: 22px;
+  --r-xxl: 28px;
   --r-full: 9999px;
   /* Bo góc panel — §7.7 điểm 1 nói phải chỉnh được, đây là chỗ chỉnh. */
   --r-panel: 18px;
@@ -87,14 +98,14 @@ body {
   z-index: 100;
   -webkit-app-region: drag;
   transition:
-    margin-top 320ms var(--e-window),
-    transform 320ms var(--e-window),
-    opacity 200ms var(--e-standard);
+    transform var(--motion-slow) var(--e-spring-soft),
+    opacity var(--motion-medium) var(--e-standard);
 }
 
 .app.nav-auto .titlebar {
-  position: relative;
-  margin-top: calc(-1 * var(--titlebar-h) + 8px);
+  position: absolute;
+  inset: 0 0 auto;
+  transform: translate3d(0, calc(-1 * var(--titlebar-h) + 8px), 0);
   opacity: 0.86;
 }
 
@@ -111,7 +122,7 @@ body {
 
 .app.nav-auto .titlebar:hover,
 .app.nav-auto .titlebar:focus-within {
-  margin-top: 0;
+  transform: translate3d(0, 0, 0);
   opacity: 1;
 }
 .app.nav-auto .titlebar:hover::before,
@@ -129,7 +140,7 @@ body {
   transform: translateX(-50%);
   border-radius: var(--r-full);
   background: color-mix(in srgb, var(--ui-primary) 65%, transparent);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--ui-primary) 28%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.22);
   transition: opacity 140ms var(--e-standard), transform 260ms var(--e-window);
 }
 .app.nav-auto .titlebar:hover::after,
@@ -156,6 +167,7 @@ body {
   background: color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent);
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 58%, transparent);
   backdrop-filter: blur(24px) saturate(125%);
+  box-shadow: var(--shadow-1);
 }
 
 /* Chế độ hiệu năng: giữ surface trong suốt nhưng bỏ compositor blur vốn tốn GPU nhất. */
@@ -226,8 +238,32 @@ body {
   scrollbar-width: none;
   height: 100%;
   min-width: 0;
+  position: relative;
 }
 .tab-bar::-webkit-scrollbar { display: none; }
+
+/* Một tonal pill duy nhất đi theo workspace đang chọn. Tính liên tục của chính bề mặt này
+   làm chuyển tab có cảm giác morph, thay vì tắt pill cũ rồi bật pill mới trong cùng frame. */
+.tab-active-indicator {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--tab-width, 0px);
+  height: 30px;
+  margin-top: -15px;
+  border-radius: var(--r-full);
+  background: var(--ui-secondary-container);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 18%, transparent);
+  transform: translate3d(var(--tab-x, 0px), 0, 0);
+  transform-origin: left center;
+  pointer-events: none;
+  contain: layout paint;
+  will-change: transform;
+  transition:
+    transform var(--motion-slow) var(--e-spring-soft),
+    width var(--motion-slow) var(--e-spring-soft),
+    opacity var(--motion-fast) var(--e-standard);
+}
 
 /* Tab là một cột: mặt tab ở trên, gạch chân sát đáy thanh. `justify-content: space-between`
    ghim gạch xuống đáy mà không cần định vị tuyệt đối — bo tròn của thanh sẽ cắt mất một
@@ -243,6 +279,8 @@ body {
   flex: none;
   min-width: 0;
   -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 1;
 }
 
 .tab-face {
@@ -256,19 +294,24 @@ body {
   font-weight: 500;
   color: var(--ui-on-surface-variant);
   white-space: nowrap;
-  transition: background 120ms var(--e-standard), color 120ms var(--e-standard);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
 
-.tab-item:hover .tab-face {
+.tab-item:not(.active):hover .tab-face {
   background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent);
   color: var(--ui-on-surface);
+  transform: translateY(-1px);
 }
 
 .tab-item.active .tab-face {
   color: var(--ui-on-secondary-container);
-  background: var(--ui-secondary-container);
+  background: transparent;
   font-weight: 650;
 }
+.tab-item:active .tab-face { transform: scale(0.96); }
 
 /* Gạch chân luôn chiếm chỗ, chỉ đổi màu — nếu để nó xuất hiện/biến mất thì mặt tab nhích
    lên xuống 2px mỗi lần đổi workspace. */
@@ -299,11 +342,14 @@ body {
 .tab-item:hover .tab-close { opacity: 0.75; }
 .tab-close { width: 15px; height: 15px; margin-right: -3px; }
 .tab-add { width: 28px; height: 28px; opacity: 0.62; align-self: center; margin-bottom: 0; }
+.tab-add { position: relative; z-index: 1; }
 .tab-close:hover,
 .tab-add:hover {
   opacity: 1;
   background: color-mix(in srgb, var(--ui-on-surface) 14%, transparent);
 }
+.tab-add:active,
+.tab-close:active { transform: scale(0.86); }
 
 .clock-pill {
   display: flex;
@@ -348,13 +394,18 @@ body {
   color: var(--ui-on-surface-variant);
   cursor: pointer;
   -webkit-app-region: no-drag;
-  transition: background 80ms ease, color 80ms ease;
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
 .win-btn:hover {
   background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent);
   color: var(--ui-on-surface);
+  transform: scale(1.08);
 }
 .win-btn.close:hover { background: var(--ui-error); color: var(--ui-on-error); }
+.win-btn:active { transform: scale(0.88); }
 
 .canvas {
   flex: 1;
@@ -420,9 +471,13 @@ body.dragging-panel .panel-host,
 
 /* Panel mở trên layer riêng để xterm nhận input ngay; chỉ opacity/transform được animate. */
 @keyframes panel-pop {
-  0% { transform: translate3d(0, 10px, 0) scale(0.965); opacity: 0; }
-  68% { transform: translate3d(0, -1px, 0) scale(1.008); opacity: 1; }
+  0% { transform: translate3d(0, 14px, 0) scale(0.96); opacity: 0; border-radius: var(--r-xxl); }
+  68% { transform: translate3d(0, -2px, 0) scale(1.006); opacity: 1; }
   100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+}
+@keyframes terminal-panel-pop {
+  from { transform: translate3d(0, 12px, 0); opacity: 0; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
 }
 .panel-motion {
   width: 100%;
@@ -432,7 +487,7 @@ body.dragging-panel .panel-host,
 }
 .panel-motion.is-moving {
   will-change: transform;
-  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--motion-slow) var(--e-spring-soft);
 }
 .workspace-motion {
   width: 100%;
@@ -448,8 +503,8 @@ body.dragging-panel .panel-host,
 .workspace-motion.leaving-right,
 .workspace-motion.leaving-left {
   will-change: transform, opacity;
-  animation-duration: 360ms;
-  animation-timing-function: var(--e-window);
+  animation-duration: 440ms;
+  animation-timing-function: var(--e-spring-soft);
   animation-fill-mode: both;
   animation-delay: calc(var(--workspace-order) * 18ms);
 }
@@ -458,25 +513,53 @@ body.dragging-panel .panel-host,
 .workspace-motion.leaving-right { animation-name: workspace-leave-right; }
 .workspace-motion.leaving-left { animation-name: workspace-leave-left; }
 @keyframes workspace-enter-right {
-  from { opacity: 0; transform: translate3d(11vw, 0, 0) scale(0.975); }
+  from { opacity: 0; transform: translate3d(clamp(32px, 6vw, 72px), 0, 0) scale(0.982); }
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes workspace-enter-left {
-  from { opacity: 0; transform: translate3d(-11vw, 0, 0) scale(0.975); }
+  from { opacity: 0; transform: translate3d(clamp(-72px, -6vw, -32px), 0, 0) scale(0.982); }
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes workspace-leave-right {
   from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to { opacity: 0; transform: translate3d(9vw, 0, 0) scale(0.975); }
+  to { opacity: 0; transform: translate3d(clamp(24px, 4vw, 56px), 0, 0) scale(0.988); }
 }
 @keyframes workspace-leave-left {
   from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to { opacity: 0; transform: translate3d(-9vw, 0, 0) scale(0.975); }
+  to { opacity: 0; transform: translate3d(clamp(-56px, -4vw, -24px), 0, 0) scale(0.988); }
 }
+
+/* Terminal glyph atlases stay pixel-sharp: workspace travel may translate/fade them but
+   never scale the WebGL canvas. Expressive overshoot is reserved for smaller UI surfaces. */
+@keyframes terminal-workspace-enter-right {
+  from { opacity: 0; transform: translate3d(clamp(32px, 6vw, 72px), 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes terminal-workspace-enter-left {
+  from { opacity: 0; transform: translate3d(clamp(-72px, -6vw, -32px), 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes terminal-workspace-leave-right {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(clamp(24px, 4vw, 56px), 0, 0); }
+}
+@keyframes terminal-workspace-leave-left {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(clamp(-56px, -4vw, -24px), 0, 0); }
+}
+.panel-host[data-panel-type="terminal"] .workspace-motion.entering-right { animation-name: terminal-workspace-enter-right; }
+.panel-host[data-panel-type="terminal"] .workspace-motion.entering-left { animation-name: terminal-workspace-enter-left; }
+.panel-host[data-panel-type="terminal"] .workspace-motion.leaving-right { animation-name: terminal-workspace-leave-right; }
+.panel-host[data-panel-type="terminal"] .workspace-motion.leaving-left { animation-name: terminal-workspace-leave-left; }
 .panel-host > .workspace-motion > .panel-motion > .panel {
   transform-origin: center;
-  animation: panel-pop 420ms var(--e-window) both;
+  animation: panel-pop 460ms var(--e-spring-soft) both;
 }
+.panel-host[data-panel-type="terminal"] > .workspace-motion > .panel-motion > .panel {
+  animation-name: terminal-panel-pop;
+}
+.panel-host > .workspace-motion.entering-right > .panel-motion > .panel,
+.panel-host > .workspace-motion.entering-left > .panel-motion > .panel { animation: none; }
 
 /* Bóng của panel vừa đóng: co lại rồi tan. Panel thật đã bị bỏ khỏi cây từ trước để
    những panel còn lại kịp trượt vào chỗ trống ngay. */
@@ -509,11 +592,14 @@ body.dragging-panel .panel-host,
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 60%, transparent);
   background: var(--ui-surface-container-lowest);
   position: relative;
-  transition: border-color 140ms var(--e-standard);
+  transition: border-color var(--motion-fast) var(--e-standard);
 }
 
 /* U1 — không glow. Panel đang chọn phân biệt bằng viền accent và thanh đầu sáng hơn. */
-.panel-host.on .panel { border-color: var(--ui-primary); }
+.panel-host.on .panel {
+  border-color: var(--ui-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 38%, transparent);
+}
 .panel-host.on .panel-head { background: var(--ui-surface-container-high); }
 
 /* ── Terminal trong suốt ──────────────────────────────────────────────────
@@ -555,7 +641,10 @@ body.dragging-panel .panel-host,
   border-radius: calc(var(--r-panel) - 1px) calc(var(--r-panel) - 1px) 0 0;
   gap: 7px;
 }
-.panel.terminal-panel .panel-dot { width: 6px; height: 6px; }
+.panel.terminal-panel .panel-dot {
+  --panel-dot-size: 6px;
+  --panel-dot-rest-scale: 0.352941;
+}
 .panel.terminal-panel .ttl { font-size: 12px; font-weight: 680; }
 .panel.terminal-panel .sub { max-width: min(48vw, 480px); color: var(--ui-on-surface-variant); font-size: 10.5px; }
 .panel.terminal-panel .panel-actions { padding: 0; gap: 0; background: transparent; }
@@ -586,10 +675,25 @@ body.dragging-panel .panel-head { cursor: grabbing; }
    Mở bốn panel là bốn hàng biểu tượng cùng lúc đập vào mắt — mà mỗi lúc ta chỉ thao tác
    trên đúng một panel. Vẫn bấm được khi mờ (`pointer-events` không tắt): rê tới là nó
    hiện trước khi kịp bấm, và trình đo tự động vẫn chạm được. */
-.panel-actions { visibility: hidden; }
+.panel-actions {
+  visibility: hidden;
+  opacity: 0;
+  transform: translate3d(4px, 0, 0) scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring-soft),
+    visibility 0s linear var(--motion-medium);
+}
 .panel-host.on .panel-actions,
 .panel:hover .panel-actions,
-.panel-actions:focus-within { visibility: visible; }
+.panel-actions:focus-within {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
 
 /* Panel hẹp tới mức không còn chỗ cho chữ: chỉ giữ chấm màu và nút `⋯`. */
 .panel-head.minimal { padding: 0 4px 0 7px; gap: 4px; }
@@ -602,18 +706,52 @@ body.dragging-panel .panel-head { cursor: grabbing; }
 .head-menu button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .panel-dot {
-  width: 7px;
+  --panel-dot-color: var(--ui-outline);
+  --panel-dot-size: 7px;
+  --panel-dot-rest-scale: 0.411765;
+  position: relative;
+  width: 17px;
   height: 7px;
   flex: none;
-  border-radius: var(--r-full);
-  background: var(--ui-outline);
 }
-.panel-dot.dot-term { background: var(--ui-accent-1); }
-.panel-dot.dot-preview { background: var(--ui-accent-6); }
-.panel-dot.dot-explorer { background: var(--ui-accent-3); }
-.panel-dot.dot-web { background: var(--ui-accent-4); }
-.panel-dot.dot-settings { background: var(--ui-accent-5); }
-.panel-dot.dot-system { background: var(--ui-accent-2); }
+.panel-dot.dot-term { --panel-dot-color: var(--ui-accent-1); }
+.panel-dot.dot-preview { --panel-dot-color: var(--ui-accent-6); }
+.panel-dot.dot-explorer { --panel-dot-color: var(--ui-accent-3); }
+.panel-dot.dot-web { --panel-dot-color: var(--ui-accent-4); }
+.panel-dot.dot-settings { --panel-dot-color: var(--ui-accent-5); }
+.panel-dot.dot-system { --panel-dot-color: var(--ui-accent-2); }
+.panel-dot::before,
+.panel-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: var(--panel-dot-size);
+  border-radius: var(--r-full);
+  background: var(--panel-dot-color);
+  transform-origin: left center;
+  transition:
+    opacity var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring-soft);
+}
+.panel-dot::before {
+  width: var(--panel-dot-size);
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+.panel-dot::after {
+  width: 17px;
+  opacity: 0;
+  transform: translateY(-50%) scaleX(var(--panel-dot-rest-scale));
+}
+.panel-host.on .panel-dot::before {
+  opacity: 0;
+  transform: translateY(-50%) scale(0.78);
+}
+.panel-host.on .panel-dot::after {
+  opacity: 1;
+  transform: translateY(-50%) scaleX(1);
+}
 
 /* Tiêu đề co được, nút thì không: panel hẹp lại thì chữ bị cắt bớt, còn nút vẫn ở nguyên
    chỗ của nó. Bản cũ để `flex: none` ở đây nên chính hàng nút bị đẩy tràn ra ngoài. */
@@ -778,22 +916,42 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   background: color-mix(in srgb, var(--ui-background) 55%, transparent);
   backdrop-filter: blur(14px);
   padding: 24px;
+  animation: overlay-in 180ms var(--e-standard) both;
 }
 
 .settings-modal {
   width: min(860px, 100%);
   height: min(600px, 100%);
   display: flex;
-  border-radius: var(--r-xl);
+  border-radius: var(--r-xxl);
   overflow: hidden;
   background: var(--ui-surface-container-low);
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 50%, transparent);
   box-shadow: 0 12px 34px rgb(0 0 0 / 0.34);
-  animation: settings-modal-in 200ms var(--e-decelerate) both;
+  animation: settings-modal-in 420ms var(--e-spring-soft) both;
 }
 @keyframes settings-modal-in {
-  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  from { opacity: 0; transform: scale(0.955) translate3d(0, 18px, 0); border-radius: 38px; }
   to { opacity: 1; transform: none; }
+}
+@keyframes settings-modal-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.975) translate3d(0, 10px, 0); }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.settings-backdrop.is-closing {
+  animation: overlay-out 200ms var(--e-standard) both;
+}
+.settings-backdrop.is-closing .settings-modal {
+  pointer-events: none;
+  animation: settings-modal-out 200ms var(--e-emphasized) both;
 }
 
 .set-rail {
@@ -820,19 +978,34 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   background: transparent;
   color: var(--ui-on-surface-variant);
   cursor: pointer;
-  transition: background 140ms var(--e-standard), color 140ms var(--e-standard), transform 160ms var(--e-decelerate);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    border-radius var(--motion-medium) var(--e-spring-soft),
+    transform var(--motion-medium) var(--e-spring);
 }
-.set-rail-nav button:hover { background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent); color: var(--ui-on-surface); }
+.set-rail-nav button:hover {
+  background: color-mix(in srgb, var(--ui-on-surface) 8%, transparent);
+  color: var(--ui-on-surface);
+  border-radius: var(--r-lg);
+  transform: scale(1.06);
+}
 .set-rail-nav button.on {
-  background: var(--ui-primary);
-  color: var(--ui-on-primary);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--ui-primary) 45%, transparent);
+  border-radius: var(--r-lg);
+  background: var(--ui-primary-container);
+  color: var(--ui-on-primary-container);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 24%, transparent);
 }
 .set-rail-nav button:active { transform: scale(0.94); }
 
 .set-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .set-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 26px 16px; }
+.set-title { animation: settings-title-in 340ms var(--e-spring-soft) both; }
+@keyframes settings-title-in {
+  from { opacity: 0; transform: translate3d(8px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
 .set-head h2 { font-size: 21px; line-height: 1.15; letter-spacing: -0.03em; color: var(--ui-on-surface); font-weight: 720; }
 .set-head p { margin-top: 4px; color: var(--ui-on-surface-variant); font-size: 11.5px; }
 .set-close {
@@ -847,14 +1020,31 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   background: color-mix(in srgb, var(--ui-on-surface) 6%, transparent);
   color: var(--ui-on-surface-variant);
   cursor: pointer;
-  transition: background 130ms var(--e-standard), color 130ms var(--e-standard);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
-.set-close:hover { background: var(--ui-error-container); color: var(--ui-on-error-container); }
+.set-close:hover {
+  background: var(--ui-error-container);
+  color: var(--ui-on-error-container);
+  transform: rotate(5deg) scale(1.06);
+}
+.set-close:active { transform: scale(0.88); }
 
 .set-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 26px 26px; scrollbar-gutter: stable; }
 
 .set-group { margin-top: 22px; }
 .set-group:first-child { margin-top: 0; }
+.set-group { animation: settings-group-in 360ms var(--e-spring-soft) both; }
+.set-group:nth-of-type(2) { animation-delay: 32ms; }
+.set-group:nth-of-type(3) { animation-delay: 64ms; }
+.set-group:nth-of-type(4) { animation-delay: 96ms; }
+.set-group:nth-of-type(n + 5) { animation-delay: 116ms; }
+@keyframes settings-group-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
 .set-group-label {
   margin: 0 2px 10px;
   font-size: 10.5px;
@@ -885,13 +1075,31 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   color: var(--ui-on-surface-variant);
   font: inherit;
   cursor: pointer;
-  transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 160ms var(--e-decelerate);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    border-color var(--motion-fast) var(--e-standard),
+    border-radius var(--motion-medium) var(--e-spring-soft),
+    transform var(--motion-medium) var(--e-spring);
 }
-.set-card:hover { background: var(--ui-surface-container-highest); color: var(--ui-on-surface); }
+.set-card:hover {
+  background: var(--ui-surface-container-highest);
+  color: var(--ui-on-surface);
+  transform: translateY(-2px);
+}
 .set-card:active { transform: scale(0.97); }
-.set-card-icon { display: flex; }
+.set-card-icon {
+  display: flex;
+  transition: transform var(--motion-medium) var(--e-spring);
+}
 .set-card-label { font-size: 11px; font-weight: 560; text-align: center; line-height: 1.25; }
-.set-card.on { border-color: var(--ui-primary); background: var(--ui-primary-container); color: var(--ui-on-primary-container); }
+.set-card.on {
+  border-color: var(--ui-primary);
+  border-radius: var(--r-xl);
+  background: var(--ui-primary-container);
+  color: var(--ui-on-primary-container);
+}
+.set-card.on .set-card-icon { transform: scale(1.1) rotate(-3deg); }
 .set-card.on .set-card-label { font-weight: 680; }
 
 .set-status { margin-top: 10px; display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--ui-on-surface-variant); }
@@ -909,9 +1117,18 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   font: inherit;
   font-size: 10.5px;
   cursor: pointer;
-  transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 180ms var(--e-decelerate);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    border-color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
-.set-chip:hover { background: var(--ui-surface-container-highest); color: var(--ui-on-surface); border-color: transparent; }
+.set-chip:hover {
+  background: var(--ui-surface-container-highest);
+  color: var(--ui-on-surface);
+  border-color: transparent;
+  transform: translateY(-1px);
+}
 .set-chip:active { transform: scale(0.96); }
 .set-chip.on { background: var(--ui-primary-container); border-color: transparent; color: var(--ui-on-primary-container); font-weight: 680; }
 
@@ -944,9 +1161,18 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   font: inherit;
   font-size: 10.5px;
   cursor: pointer;
-  transition: background 130ms var(--e-standard), color 130ms var(--e-standard), border-color 130ms var(--e-standard), transform 180ms var(--e-decelerate);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    border-color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
-.set-btn:hover { background: var(--ui-primary-container); color: var(--ui-on-primary-container); border-color: transparent; }
+.set-btn:hover {
+  background: var(--ui-primary-container);
+  color: var(--ui-on-primary-container);
+  border-color: transparent;
+  transform: translateY(-1px);
+}
 .set-btn:active { transform: scale(0.96); }
 
 .set-slider { align-items: center; flex-wrap: wrap; }
@@ -994,6 +1220,22 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
 @media (max-width: 620px) {
   .set-keylist { grid-template-columns: minmax(0, 1fr); }
   .set-grid.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .settings-backdrop { padding: 10px; }
+  .settings-modal {
+    width: 100%;
+    height: min(680px, 100%);
+    border-radius: var(--r-xl);
+  }
+  .set-rail { width: 64px; gap: 18px; padding: 16px 0; }
+  .set-rail-logo { width: 30px; height: 30px; }
+  .set-rail-nav { gap: 7px; }
+  .set-rail-nav button { width: 40px; height: 40px; }
+  .set-head { padding: 18px 16px 13px; }
+  .set-head h2 { font-size: 19px; }
+  .set-scroll { padding: 4px 16px 22px; }
 }
 
 .gutter.row { cursor: col-resize; }
@@ -1151,12 +1393,16 @@ body.dragging-panel * {
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms var(--e-standard);
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
 .empty-btn.primary { background: var(--ui-primary); color: var(--ui-on-primary); }
 .empty-btn.primary:hover { background: var(--ui-primary-container); color: var(--ui-on-primary-container); }
 .empty-btn.secondary { background: var(--ui-surface-container-high); color: var(--ui-on-surface); }
 .empty-btn.secondary:hover { background: var(--ui-surface-container-highest); }
+.empty-btn:hover { transform: translateY(-2px); }
+.empty-btn:active { transform: scale(0.96); }
 .empty-hints {
   margin-top: 18px;
   font-size: 11px;
@@ -1192,9 +1438,10 @@ body.dragging-panel * {
 .dock-wrap.auto .dock {
   transform: translateY(calc(100% + var(--gap) * 2));
   opacity: 0;
+  will-change: transform, opacity;
   transition:
-    transform 260ms var(--e-emphasized),
-    opacity 180ms var(--e-standard);
+    transform var(--motion-slow) var(--e-spring-soft),
+    opacity var(--motion-medium) var(--e-standard);
 }
 .dock-wrap.auto:hover .dock {
   transform: none;
@@ -1208,8 +1455,12 @@ body.dragging-panel * {
   height: 32px;
   pointer-events: auto;
 }
-.dock-wrap.auto:hover .dock-hot {
-  pointer-events: none;
+/* Giữ vùng bắt chuột sống trong suốt lúc dock trồi lên. Tắt nó ngay khi `:hover` vừa
+   khớp tạo vòng lặp hover -> pointer-events:none -> mất hover, khiến dock chỉ chớp. */
+.dock-wrap.auto:focus-within .dock,
+.dock-wrap.auto .dock:focus-within {
+  transform: none;
+  opacity: 1;
 }
 /* Dock ẩn thì canvas lấy lại chỗ nó chừa sẵn. */
 .app.dock-auto .canvas { padding-bottom: var(--gap); }
@@ -1219,10 +1470,11 @@ body.dragging-panel * {
   align-items: center;
   gap: 6px;
   padding: 7px;
-  border-radius: var(--r-xl);
+  border-radius: var(--r-xxl);
   background: color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent);
   border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 58%, transparent);
   backdrop-filter: blur(24px) saturate(125%);
+  box-shadow: var(--shadow-1);
   pointer-events: auto;
   user-select: none;
 }
@@ -1246,27 +1498,46 @@ body.dragging-panel * {
   background: var(--tile);
   color: var(--on-tile);
   cursor: pointer;
-  transition: transform 180ms var(--e-emphasized), filter 140ms var(--e-standard);
+  transition:
+    transform var(--motion-slow) var(--e-spring),
+    border-radius var(--motion-medium) var(--e-spring-soft),
+    filter var(--motion-fast) var(--e-standard);
 }
 
-.dock-item:hover {
-  animation: dock-jiggle 340ms var(--e-bounce) both;
+.dock-item:hover,
+.dock-item:focus-visible {
+  transform: translate3d(0, -7px, 0) scale(1.1);
+  border-radius: var(--r-lg);
   filter: brightness(1.12);
 }
-.dock-item:active { transform: translateY(-2px) scale(0.98); }
 
-@keyframes dock-jiggle {
-  0%   { transform: translateY(0) scale(1) rotate(0); }
-  55%  { transform: translateY(-7px) scale(1.08) rotate(-1.2deg); }
-  78%  { transform: translateY(-5px) scale(1.06) rotate(0.8deg); }
-  100% { transform: translateY(-6px) scale(1.08) rotate(0); }
+/* CSS proximity wave: item dưới con trỏ đi cao nhất, hai hàng xóm đi theo một nhịp nhỏ.
+   Không phát lại keyframe khi rê qua ranh giới icon nên chuyển động giữ được vận tốc. */
+@supports selector(.dock:has(> .dock-item:hover)) {
+  .dock:has(> .dock-item:hover) > .dock-item {
+    transform: translate3d(0, 1px, 0) scale(0.95);
+    filter: saturate(0.9) brightness(0.96);
+  }
+  .dock:has(> .dock-item:hover) > .dock-item:hover {
+    transform: translate3d(0, -8px, 0) scale(1.13);
+    filter: brightness(1.12);
+  }
+  .dock:has(> .dock-item:hover) > .dock-item:has(+ .dock-item:hover),
+  .dock:has(> .dock-item:hover) > .dock-item:hover + .dock-item {
+    transform: translate3d(0, -3px, 0) scale(1.035);
+    filter: brightness(1.04);
+  }
+  .dock:has(> .dock-item:active) > .dock-item:active {
+    transform: translate3d(0, -3px, 0) scale(0.92);
+  }
 }
+.dock-item:active { transform: translate3d(0, -3px, 0) scale(0.92); }
 
 .dock-tip {
   position: absolute;
   bottom: calc(100% + 9px);
   left: 50%;
-  transform: translateX(-50%) translateY(4px);
+  transform: translate3d(-50%, 5px, 0) scale(0.94);
   padding: 5px 11px;
   border-radius: var(--r-full);
   background: var(--ui-inverse-surface);
@@ -1276,9 +1547,15 @@ body.dragging-panel * {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 130ms var(--e-standard), transform 130ms var(--e-standard);
+  transition:
+    opacity var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring-soft);
 }
-.dock-item:hover .dock-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+.dock-item:hover .dock-tip,
+.dock-item:focus-visible .dock-tip {
+  opacity: 1;
+  transform: translate3d(-50%, 0, 0) scale(1);
+}
 
 /* ==========================================================================
    Nút bấm dùng chung
@@ -1294,12 +1571,17 @@ body.dragging-panel * {
   color: var(--ui-on-surface-variant);
   display: grid;
   place-items: center;
-  transition: background 110ms ease, color 110ms ease;
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring);
 }
 .iconbtn:hover {
   background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent);
   color: var(--ui-on-surface);
+  transform: scale(1.08);
 }
+.iconbtn:active { transform: scale(0.84); }
 .iconbtn.close:hover { background: var(--ui-error); color: var(--ui-on-error); }
 .iconbtn.on {
   background: color-mix(in srgb, var(--ui-primary) 22%, transparent);
@@ -1369,6 +1651,11 @@ body.dragging-panel * {
   background: var(--ui-error-container);
   color: var(--ui-on-error-container);
   font-size: 12px;
+  animation: notice-in 420ms var(--e-spring-soft) both;
+}
+@keyframes notice-in {
+  from { opacity: 0; transform: translate3d(-50%, 10px, 0) scale(0.96); }
+  to { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); }
 }
 
 /* ── Preview Panels (Phase 05) ─────────────────────────────────── */
@@ -1499,6 +1786,7 @@ body.dragging-panel * {
   justify-content: center;
   align-items: flex-start;
   padding-top: 12vh;
+  animation: overlay-in 160ms var(--e-standard) both;
 }
 
 .palette-modal {
@@ -1506,10 +1794,27 @@ body.dragging-panel * {
   max-width: 90vw;
   background: var(--ui-surface-container-high);
   border: 1px solid var(--ui-outline-variant);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-xxl);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 16px 42px rgb(0 0 0 / 0.32);
+  animation: palette-modal-in 380ms var(--e-spring-soft) both;
+}
+@keyframes palette-modal-in {
+  from { opacity: 0; transform: translate3d(0, -16px, 0) scale(0.96); border-radius: 38px; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes palette-modal-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.98); }
+}
+.palette-backdrop.is-closing {
+  animation: overlay-out 180ms var(--e-standard) both;
+}
+.palette-backdrop.is-closing .palette-modal {
+  pointer-events: none;
+  animation: palette-modal-out 180ms var(--e-emphasized) both;
 }
 
 .palette-input-wrap {
@@ -1519,6 +1824,10 @@ body.dragging-panel * {
   padding: 14px 18px;
   border-bottom: 1px solid var(--ui-outline-variant);
   color: var(--ui-on-surface-variant);
+}
+.palette-input-wrap:focus-within {
+  border-color: var(--ui-primary);
+  box-shadow: inset 0 0 0 2px var(--ui-primary);
 }
 
 .palette-input {
@@ -1566,15 +1875,36 @@ body.dragging-panel * {
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   cursor: pointer;
-  transition: background 80ms ease;
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    color var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring-soft);
   user-select: none;
+  animation: palette-item-in 300ms var(--e-spring-soft) backwards;
+  animation-delay: calc(55ms + var(--palette-order, 0) * 16ms);
+}
+@keyframes palette-item-in {
+  from { opacity: 0; transform: translate3d(0, 7px, 0); }
+  to { opacity: 1; transform: none; }
 }
 
-.palette-item.selected,
 .palette-item:hover {
   background: var(--ui-surface-container-highest);
+  transform: translate3d(2px, 0, 0);
+}
+.palette-item.selected {
+  background: var(--ui-secondary-container);
+  color: var(--ui-on-secondary-container);
+  transform: translate3d(3px, 0, 0);
+}
+.palette-item.selected .palette-item-title { color: var(--ui-on-secondary-container); }
+.palette-item.selected .palette-item-cat,
+.palette-item.selected .palette-item-shortcut {
+  background: color-mix(in srgb, var(--ui-on-secondary-container) 10%, transparent);
+  color: var(--ui-on-secondary-container);
+  border-color: color-mix(in srgb, var(--ui-on-secondary-container) 24%, transparent);
 }
 
 .palette-item-cat {
@@ -2100,11 +2430,11 @@ body.dragging-panel * {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  animation: ctx-in 110ms var(--e-decelerate);
+  animation: ctx-in 220ms var(--e-spring-soft);
 }
 
 @keyframes ctx-in {
-  from { opacity: 0; transform: translateY(-3px) scale(0.985); }
+  from { opacity: 0; transform: translate3d(0, -7px, 0) scale(0.97); border-radius: var(--r-xl); }
   to   { opacity: 1; transform: none; }
 }
 
@@ -2122,7 +2452,9 @@ body.dragging-panel * {
   font-size: 12.5px;
   text-align: left;
   cursor: pointer;
-  transition: background 80ms ease;
+  transition:
+    background var(--motion-fast) var(--e-standard),
+    transform var(--motion-medium) var(--e-spring-soft);
 }
 
 /* Vạch ngăn vẽ bằng `margin` + `border-top` của chính mục, không phải một thẻ riêng —
@@ -2134,7 +2466,10 @@ body.dragging-panel * {
   border-radius: 0 0 var(--r-sm) var(--r-sm);
 }
 
-.ctx-item:hover:not(:disabled) { background: var(--ui-surface-container-highest); }
+.ctx-item:hover:not(:disabled) {
+  background: var(--ui-surface-container-highest);
+  transform: translate3d(2px, 0, 0);
+}
 .ctx-item:disabled { opacity: 0.38; cursor: default; }
 
 .ctx-icon {
@@ -2170,8 +2505,10 @@ body.dragging-panel * {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
@@ -2208,6 +2545,7 @@ body.dragging-panel * {
 .app.surface-flat .dock {
   background: var(--ui-surface-container);
   border-color: var(--ui-outline-variant);
+  box-shadow: none;
 }
 
 .app.surface-flat .panel { border-color: var(--ui-outline-variant); }
@@ -2236,6 +2574,7 @@ body.dragging-panel * {
   border-color: var(--ui-outline-variant);
   box-shadow: none;
 }
+.app.surface-flat .palette-modal { box-shadow: none; }
 
 /* Thanh trên ở chế độ tự ẩn không còn cần mờ đi để lộ ảnh nền — nó chỉ cần trượt lên. */
 .app.surface-flat.nav-auto .titlebar { opacity: 1; }

@@ -57,11 +57,23 @@ for (const scheme of SCHEMES) {
   for (const dark of [true, false]) {
     const opts = { ...P.DEFAULTS, scheme, dark };
     let worstText = Infinity;
+    let worstSelectionText = Infinity;
+    let worstSelectionEdge = Infinity;
     let ratioSum = 0;
 
     for (const seed of SEEDS) {
       const s = P.buildScheme(seed, opts);
       const ui = P.chromeVars(s);
+      const term = P.xtermTheme(s, opts);
+
+      worstSelectionText = Math.min(
+        worstSelectionText,
+        contrast(term.selectionForeground, term.selectionBackground),
+      );
+      worstSelectionEdge = Math.min(
+        worstSelectionEdge,
+        contrast(term.selectionBackground, ui["--ui-surface-container-lowest"]),
+      );
 
       // C4 — chữ trên nền phải đọc được ở mọi tổ hợp, không riêng tổ hợp đẹp.
       for (const [fg, bg] of [
@@ -95,7 +107,8 @@ for (const scheme of SCHEMES) {
     // Monochrome cố ý không có chroma — nhân bao nhiêu cũng vẫn xám. Miễn cho nó.
     const ratioOk = scheme === "Monochrome" || ratio >= 1.5;
     const textOk = worstText >= 4.5;
-    if (!ratioOk || !textOk) fail++;
+    const selectionOk = worstSelectionText >= 4.5 && worstSelectionEdge >= 3;
+    if (!ratioOk || !textOk || !selectionOk) fail++;
     rows.push({
       scheme,
       mode: dark ? "dark" : "light",
@@ -103,6 +116,8 @@ for (const scheme of SCHEMES) {
       C4: textOk ? "PASS" : "FAIL",
       chroma_ratio: ratio.toFixed(2),
       C5: ratioOk ? "PASS" : "FAIL",
+      selection: `${worstSelectionText.toFixed(2)}/${worstSelectionEdge.toFixed(2)}`,
+      UX1: selectionOk ? "PASS" : "FAIL",
     });
   }
 }
@@ -114,6 +129,7 @@ for (const dark of [true, false]) {
   const opts = { ...P.DEFAULTS, dark };
   const s = P.buildBrandScheme(opts);
   const ui = P.chromeVars(s);
+  const term = P.xtermTheme(s, opts);
 
   let worstText = Infinity;
   for (const [fg, bg] of [
@@ -141,12 +157,15 @@ for (const dark of [true, false]) {
   // C7 — nền phải là navy có màu thật, không phải xám. Chroma tụt về 0 nghĩa là
   // `BRAND_NEUTRAL_CHROMA` đã bị ai đó kéo xuống và app quay lại thành cái hộp xám.
   const bgChroma = chroma(ui["--ui-background"]);
+  const selectionText = contrast(term.selectionForeground, term.selectionBackground);
+  const selectionEdge = contrast(term.selectionBackground, ui["--ui-surface-container-lowest"]);
 
   const textOk = worstText >= 4.5;
   const ratioOk = ratio >= 1.5;
   const hueOk = hueGap <= 8;
   const bgOk = dark ? bgChroma >= 6 : bgChroma >= 2;
-  if (!textOk || !ratioOk || !hueOk || !bgOk) fail++;
+  const selectionOk = selectionText >= 4.5 && selectionEdge >= 3;
+  if (!textOk || !ratioOk || !hueOk || !bgOk || !selectionOk) fail++;
 
   rows.push({
     scheme: "Brand",
@@ -159,6 +178,8 @@ for (const dark of [true, false]) {
     C6: hueOk ? "PASS" : "FAIL",
     bg_chroma: bgChroma.toFixed(1),
     C7: bgOk ? "PASS" : "FAIL",
+    selection: `${selectionText.toFixed(2)}/${selectionEdge.toFixed(2)}`,
+    UX1: selectionOk ? "PASS" : "FAIL",
   });
 }
 

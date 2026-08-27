@@ -355,7 +355,10 @@ export function terminalVars(s: DynamicScheme, o: ThemeOptions): Record<string, 
   const bg = MaterialDynamicColors.surfaceContainerLowest.getArgb(s);
   const fg = MaterialDynamicColors.onSurface.getArgb(s);
   const cursor = boost(MaterialDynamicColors.primary.getArgb(s), k);
-  const sel = MaterialDynamicColors.secondaryContainer.getArgb(s);
+  // Selection phải nổi rõ trên cả wallpaper lẫn nền terminal đục. `secondaryContainer`
+  // hợp với chrome nhưng thường quá gần `surfaceContainerLowest`, nhất là palette xanh
+  // tối; dùng cặp primary/onPrimary đảm bảo chính Material scheme đã chọn độ tương phản.
+  const sel = MaterialDynamicColors.primary.getArgb(s);
 
   // Nền terminal *phải* đục theo `termOpacity`, còn lớp bên dưới nó là ảnh nền thật.
   // `--term-backdrop` làm mờ ảnh nền đó: không mờ thì chữ nằm đè lên chi tiết ảnh và
@@ -386,6 +389,7 @@ export function terminalVars(s: DynamicScheme, o: ThemeOptions): Record<string, 
 /** Object đưa thẳng vào `Terminal.options.theme`. Tên khoá là của xterm, không đổi được. */
 export function xtermTheme(s: DynamicScheme, o: ThemeOptions) {
   const a = ansiColors(s, o);
+  const selection = MaterialDynamicColors.primary.getArgb(s);
   return {
     // xterm **không** tô nền: lớp alpha duy nhất là `background: var(--term-bg)` của `.term`
     // trong CSS. Để xterm tô nữa thì hai lớp nhân nhau, và tệ hơn là chỗ lưới ký tự chia
@@ -395,8 +399,10 @@ export function xtermTheme(s: DynamicScheme, o: ThemeOptions) {
     foreground: hexFromArgb(MaterialDynamicColors.onSurface.getArgb(s)),
     cursor: hexFromArgb(boost(MaterialDynamicColors.primary.getArgb(s), o.termChroma)),
     cursorAccent: hexFromArgb(MaterialDynamicColors.onPrimary.getArgb(s)),
-    selectionBackground: hexFromArgb(MaterialDynamicColors.secondaryContainer.getArgb(s)),
-    selectionForeground: hexFromArgb(MaterialDynamicColors.onSecondaryContainer.getArgb(s)),
+    selectionBackground: hexFromArgb(selection),
+    selectionForeground: hexFromArgb(MaterialDynamicColors.onPrimary.getArgb(s)),
+    // Khi terminal mất focus, vùng đã chọn vẫn phải nhìn ra được thay vì mờ gần như mất.
+    selectionInactiveBackground: hexFromArgb(MaterialDynamicColors.primaryContainer.getArgb(s)),
     ...a,
   };
 }
