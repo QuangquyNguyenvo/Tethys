@@ -98,11 +98,28 @@ This is a repeatable development snapshot, not a universal guarantee — wallpap
 
 ## Interface
 
-<div align="center">
-  <img src="assets/screenshots/glass.png" alt="Tethys Mica glass terminal panel with file explorer" width="32%" />
-  <img src="assets/screenshots/tiling.png" alt="Tethys split-panel tiling terminal workspace" width="32%" />
-  <img src="assets/screenshots/widgets.png" alt="Tethys terminal workspace with explorer, embedded web panel, and dock" width="32%" />
-</div>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/app-launch.webp" alt="Tethys opening to a new workspace" width="100%" />
+      <br /><sub><b>Launch instantly</b> — start with a terminal or file explorer.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/workspace-switch.webp" alt="Tethys switched to another workspace with a different wallpaper" width="100%" />
+      <br /><sub><b>Switch workspaces</b> — keep separate layouts one click away.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/settings.webp" alt="Tethys Appearance settings with Material You palette controls" width="100%" />
+      <br /><sub><b>Tune every detail</b> — colors, surfaces, layout, and shortcuts.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/wallpaper-theme.webp" alt="Tethys after changing to a red wallpaper and matching Material You theme" width="100%" />
+      <br /><sub><b>Make it yours</b> — wallpaper colors flow through the entire shell.</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
