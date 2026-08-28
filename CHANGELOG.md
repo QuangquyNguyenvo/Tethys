@@ -11,6 +11,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Panels now interpolate their size as well as their position when the layout changes.
   Splitting used to slide a panel to its new place while snapping it to its new width in
   the same instant, so one movement ran at two speeds. The divider travels with them.
+- Terminals no longer refit on every frame of a layout animation. Any change to a terminal's
+  column or row count reflows its whole scrollback and reallocates its WebGL texture, and
+  doing that thirty times in a row made the animation stutter; the fit is deferred to a
+  single measurement once the layout settles.
+- Shortened the layout and workspace transitions. A panel is the only thing moving on
+  screen, so half a second only read as sluggish: layout changes take 320ms, a workspace
+  arrives in 380ms and leaves in 200ms.
 - The top bar follows Material You the way Settings already does. Workspace, window and
   add-workspace icons come from Material Symbols and the active workspace switches to the
   filled variant, so which tab is open reads from the icon's shape rather than from a tint.

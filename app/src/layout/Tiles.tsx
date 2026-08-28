@@ -22,6 +22,9 @@ const SystemPanel = lazy(() => import("../system/SystemPanel").then(({ SystemPan
 
 type Props = { theme?: ITheme };
 
+/** Phải khớp `--motion-layout` trong `App.css`. */
+const LAYOUT_MOTION_MS = 320;
+
 type WorkspaceTransition = {
   leavingKeys: Set<string>;
   layout: Layout;
@@ -113,6 +116,35 @@ export function Tiles({ theme }: Props) {
     [tree, box.w, box.h],
   );
 
+  // Cờ "layout đang chạy hoạt ảnh". Chỉ bật khi *cây layout* đổi — chia đôi, đóng panel,
+  // hoán vị — tức đúng những lúc `.panel-host` nội suy kích thước. `usePty.ts` đọc cờ này
+  // để hoãn `fit()` của xterm cho tới khi mọi thứ đứng yên.
+  //
+  // Kéo thanh chia và kéo thả panel cũng đổi cây, mỗi khung hình một lần, nhưng ở đó
+  // transition đã tắt và chữ phải bám tay người dùng — nên loại trừ, nếu không terminal
+  // sẽ đứng hình suốt cả thao tác kéo.
+  const treeRef = useRef(tree);
+  const layoutAnimTimerRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const changed = treeRef.current !== tree;
+    treeRef.current = tree;
+    if (!changed) return;
+    const body = document.body;
+    if (body.classList.contains("resizing-layout") || body.classList.contains("dragging-panel")) {
+      return;
+    }
+    body.classList.add("layout-anim");
+    if (layoutAnimTimerRef.current !== null) window.clearTimeout(layoutAnimTimerRef.current);
+    layoutAnimTimerRef.current = window.setTimeout(() => {
+      layoutAnimTimerRef.current = null;
+      body.classList.remove("layout-anim");
+    }, LAYOUT_MOTION_MS + 60);
+  }, [tree]);
+  useEffect(() => () => {
+    if (layoutAnimTimerRef.current !== null) window.clearTimeout(layoutAnimTimerRef.current);
+    document.body.classList.remove("layout-anim");
+  }, []);
+
   // Store cần hình học này để tính đích thả mà không phải import ngược lên đây.
   useEffect(() => {
     setSnapshot({ layout, origin: box });
@@ -178,13 +210,13 @@ export function Tiles({ theme }: Props) {
     // Tying it to this effect's cleanup used to leave the old workspace permanently visible
     // when the window changed size during the animation.
     //
-    // Phải dài hơn panel vào *cuối cùng*, tức là 480ms của animation cộng bậc thang lớn
-    // nhất (6 × 26ms). Hết giờ sớm thì `workspaceTransition` bị xoá giữa chừng, class
+    // Phải dài hơn panel vào *cuối cùng*, tức là 380ms của animation cộng bậc thang lớn
+    // nhất (6 × 16ms). Hết giờ sớm thì `workspaceTransition` bị xoá giữa chừng, class
     // `entering-*` rơi khỏi phần tử, và panel nhảy phắt về vị trí cuối.
     workspaceTimerRef.current = window.setTimeout(() => {
       workspaceTimerRef.current = null;
       setWorkspaceTransition(null);
-    }, 700);
+    }, 560);
   }, [activeWorkspaceId, workspaces, box.w, box.h]);
 
   // Bóng panel vừa đóng.
@@ -316,12 +348,12 @@ function PanelHost({
       setMotionArmed(true);
       setMotionOffset(null);
       frameRef.current = null;
-      // Phải dài hơn `--motion-layout` (520ms): hết giờ sớm là `will-change` bị gỡ ngay
-      // giữa lúc panel còn đang trượt, và lớp compositor bị gộp lại đúng lúc cần nó nhất.
+      // Phải dài hơn `--motion-layout`: hết giờ sớm là `will-change` bị gỡ ngay giữa lúc
+      // panel còn đang trượt, và lớp compositor bị gộp lại đúng lúc cần nó nhất.
       motionTimerRef.current = window.setTimeout(() => {
         motionTimerRef.current = null;
         setMotionArmed(false);
-      }, 640);
+      }, LAYOUT_MOTION_MS + 120);
     });
     return () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);

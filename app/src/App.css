@@ -37,12 +37,15 @@ body {
   --motion-slow: 460ms;
   --motion-pop: 420ms;
   /* Panel đổi chỗ và đổi cỡ.
-     Dài hơn phần còn lại và **không nhún**: `--e-spring-soft` vọt qua đích 12% quãng
-     đường, mà quãng đường của một panel là hàng trăm pixel — 12% của 400px là 48px chữ
-     trượt quá rồi trượt về. Trên một cái chip 32px thì đó là nảy; trên một mặt terminal
-     thì đó là rung. Đường cong emphasized của M3 đi nhanh lúc đầu, hãm dần về cuối, và
-     dừng đúng chỗ. */
-  --motion-layout: 520ms;
+     **Không nhún**: `--e-spring-soft` vọt qua đích 12% quãng đường, mà quãng đường của một
+     panel là hàng trăm pixel — 12% của 400px là 48px chữ trượt quá rồi trượt về. Trên một
+     cái chip 32px thì đó là nảy; trên một mặt terminal thì đó là rung. Đường cong
+     emphasized của M3 đi nhanh lúc đầu, hãm dần về cuối, và dừng đúng chỗ.
+
+     Và **ngắn**. Bản đầu để 520ms vì nghĩ mặt càng lớn thì đi càng lâu; thực tế panel là
+     thứ duy nhất trên màn hình đang động, không có gì để mắt so sánh, nên nửa giây chỉ đọc
+     ra là ì. 320ms vẫn thấy rõ quãng đường mà không phải chờ. */
+  --motion-layout: 320ms;
   --e-layout: cubic-bezier(0.2, 0.0, 0, 1.0);
 
   /* ── Kính ──────────────────────────────────────────────────────────
@@ -523,8 +526,11 @@ body {
      nửa của cùng một chuyển động chạy ở hai tốc độ khác nhau. Nội suy nó ở đây khiến cả
      hai đi cùng nhịp.
 
-     Giá phải trả là xterm `fit()` lại mỗi khung hình trong lúc animate. Đó đúng bằng thứ
-     đã xảy ra suốt khi kéo thanh chia, chỉ khác là kéo dài nửa giây rồi thôi. */
+     Cái giá của việc này là mỗi khung hình phải layout lại — chấp nhận được, `contain`
+     chặn không cho lan ra ngoài panel. Cái *không* chấp nhận được là xterm `fit()` theo:
+     đổi cols/rows là dồn lại toàn bộ scrollback rồi cấp lại texture WebGL, ba mươi lần
+     liên tiếp. `Tiles.tsx` bật cờ `body.layout-anim` suốt hoạt ảnh và `usePty.ts` hoãn
+     `fit()` tới khi cờ tắt, nên cả quãng chỉ còn đúng một lần đo lại. */
   transition:
     width var(--motion-layout) var(--e-layout),
     height var(--motion-layout) var(--e-layout);
@@ -621,16 +627,16 @@ body.resizing-window .gutter,
 }
 .workspace-motion.entering-right,
 .workspace-motion.entering-left {
-  animation-duration: 480ms;
+  animation-duration: 380ms;
   animation-timing-function: var(--e-decelerate);
   /* Các panel vào lệch nhau một nhịp nhỏ, nên workspace mới trải ra chứ không bật lên
      nguyên khối. `Tiles.tsx` chặn bậc thang ở 6 để một workspace nhiều panel không kéo
      dài chuyển cảnh thành một giây. */
-  animation-delay: calc(var(--workspace-order) * 26ms);
+  animation-delay: calc(var(--workspace-order) * 16ms);
 }
 .workspace-motion.leaving-right,
 .workspace-motion.leaving-left {
-  animation-duration: 240ms;
+  animation-duration: 200ms;
   animation-timing-function: cubic-bezier(0.3, 0, 0.8, 0.15);
 }
 .workspace-motion.entering-right { animation-name: workspace-enter-right; }
