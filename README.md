@@ -24,7 +24,11 @@ Running `claude`, `codex`, `aider` (or any CLI agent) all day means it's constan
 Everything lives on one tiling canvas: split panels, drag them around, resize freely. The terminal is a tile in your workspace, not the whole app.
 
 <div align="center">
-  <img src="assets/screenshots/preview.png" alt="Tethys tiling terminal workspace showing multiple panels and Material You theme settings" width="100%" />
+  <a href="assets/demo/tethys-demo.mp4">
+    <img src="assets/demo/tethys-demo.webp" alt="Tethys demo showing tiling panels, embedded web and file explorer views, Material You themes, and multiple workspaces" width="100%" />
+  </a>
+  <br />
+  <sub>▶ Click the preview to watch the full 720p demo</sub>
 </div>
 
 ---
@@ -94,11 +98,28 @@ This is a repeatable development snapshot, not a universal guarantee. Wallpaper,
 
 ## Interface
 
-<div align="center">
-  <img src="assets/screenshots/glass.png" alt="Tethys Mica glass terminal panel with file explorer" width="32%" />
-  <img src="assets/screenshots/tiling.png" alt="Tethys split-panel tiling terminal workspace" width="32%" />
-  <img src="assets/screenshots/widgets.png" alt="Tethys terminal workspace with explorer, embedded web panel, and dock" width="32%" />
-</div>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/app-launch.webp" alt="Tethys opening to a new workspace" width="100%" />
+      <br /><sub><b>Launch instantly</b> — start with a terminal or file explorer.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/workspace-switch.webp" alt="Tethys switched to another workspace with a different wallpaper" width="100%" />
+      <br /><sub><b>Switch workspaces</b> — keep separate layouts one click away.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/settings.webp" alt="Tethys Appearance settings with Material You palette controls" width="100%" />
+      <br /><sub><b>Tune every detail</b> — colors, surfaces, layout, and shortcuts.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/screenshots/wallpaper-theme.webp" alt="Tethys after changing to a red wallpaper and matching Material You theme" width="100%" />
+      <br /><sub><b>Make it yours</b> — wallpaper colors flow through the entire shell.</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
