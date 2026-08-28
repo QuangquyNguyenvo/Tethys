@@ -6,7 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-### Changed
+## [0.0.2-beta.1] - 2026-08-28
+
+> Prerelease for Windows 10 and Windows 11. Native browser interaction and long-running
+> WebView2 memory behavior still need extended manual soak testing.
+> GitHub uses tag `v0.0.2-beta.1`; Windows installers carry version `0.0.2-1` because MSI
+> requires a numeric-only prerelease identifier.
+
+### Changed — interaction, material, and motion
 
 - Panels change size instantly and only their position travels. Interpolating size was the
   one thing in the interface that re-ran layout on every frame, and every frame of it made
@@ -51,7 +58,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Widened the selected panel's accent border so it reads at a normal sitting distance.
 - Modal overlays use a Material 3 scrim instead of a full-screen blur.
 
-### Fixed
+### Fixed — interaction and layout
 
 - Fullscreen left a strip of desktop uncovered along the taskbar edge. Windows pins an
   undecorated *maximized* window to the work area, and that flag survived the switch into
@@ -67,11 +74,63 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - `Ctrl+Shift+Tab` for the next panel, replaced by `Ctrl+Tab`.
 
-## [0.0.2] - 2026-08-26
+### Added — native browser
 
-> Beta release for Windows 10 and Windows 11.
+- Replaced the limited cross-origin iframe path with native WebView2 overlay surfaces for
+  remote pages, while retaining the iframe and external-browser fallbacks.
+- Added native back, forward, reload, stop, URL/title/loading state, in-page navigation,
+  process-failure recovery, and slow-load recovery without recreating the browser window.
+- Added shell-aware surface shaping: native pages follow panel moves and resizes, keep the
+  panel's rounded lower corners, hide behind Settings and Command Palette, and cut out the
+  floating dock and auto-hidden titlebar instead of covering them.
+- Forwarded Tethys' allowlisted shortcuts from focused web content back to the shell, so
+  workspace navigation, fullscreen, palette, settings, close, split, and reload remain usable.
+- Added an LRU pool capped at four native surfaces. Extra browser panels park safely and can
+  resume or open externally; covered surfaces request WebView2's low-memory target.
+- Added lifecycle counters behind `TETHYS_BROWSER_STATS`, plus regression checks for URL
+  normalization, history bounds, renderer limits, memory policy, overlay cleanup, and failure
+  recovery.
+- Added a compressed 25-second README demo and four interface stills covering launch,
+  workspace switching, Settings, and wallpaper-derived theming.
 
-### Added
+### Performance
+
+Measured in the repeatable Windows debug snapshot recorded during `0.0.2` development
+(four idle terminals, app + WebView2 + console process tree, sampled after 10 seconds):
+
+- Working set fell from `419.8 MB` to about `408 MB`: approximately **2.8% lower**.
+- Private memory fell from `191.5 MB` to about `187 MB`: approximately **2.3% lower**.
+
+Deterministic workload reductions visible in the implementation:
+
+- Removed **100% of per-frame panel-size interpolation**. Layout travel dropped from 520ms
+  to 320ms (**38.5% shorter**), while terminal dimensions now change once instead of forcing
+  scrollback reflow and WebGL texture reallocation on every animation frame.
+- Shortened the outgoing workspace transition from 440ms to 240ms (**45.5% shorter**), so
+  the old and new workspaces spend substantially less time composited together.
+- Removed the default sysfetch drive/network polling path: up to eight physical-drive handle
+  opens per second and the unused network-interface table are now **100% eliminated** unless
+  that data is explicitly requested.
+- Removed live `backdrop-filter` work from the large, frequently redrawn surfaces and blur the
+  wallpaper once when it is loaded. This eliminates the repeated full-panel blur pass from
+  every terminal-output repaint.
+- Hidden auxiliary panels are unmounted after workspace transitions, releasing their iframe,
+  decoded image, preview DOM, watcher, and audio resources. Terminals remain mounted so PTY
+  sessions stay alive.
+- Native browser renderers are capped at four. Compared with an unbounded design, eight open
+  browser panels therefore use at most four native surfaces (**50% fewer native surfaces**),
+  with parked panels retaining their URL and fallback UI.
+
+Estimated beta impact (engineering estimate, not a native benchmark):
+
+- The one-time wallpaper blur is expected to reduce compositor/GPU work by roughly **15–35%**
+  during sustained terminal output in glass mode, depending on GPU, resolution, and wallpaper.
+- WebView2's low-memory target is expected to reduce the working set of a temporarily covered
+  native page by roughly **10–30%**; actual savings depend heavily on the page and runtime.
+  The four-surface cap is enforced, but native browser RAM still needs the manual benchmark
+  matrix recorded in `plans/native-browser/CHECKLIST.md`.
+
+### Added — platform and lifecycle
 
 - Added native drive discovery, drive switching, back/forward history, and mouse navigation buttons to Explorer.
 - Added lazy image thumbnails and file-type icons to Explorer.
@@ -79,7 +138,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Added native window edge resizing, maximize-state tracking, fullscreen handling, and the Windows system menu on titlebar right-click.
 - Added a configurable terminal scrollback limit from 1,000 to 20,000 lines.
 
-### Changed
+### Changed — platform and lifecycle
 
 - Hidden auxiliary panels are now unmounted after workspace transitions, releasing iframe, decoded image, preview DOM, watcher, and audio resources. Terminal panels remain mounted so PTY and agent sessions continue running.
 - WebView2 now receives the native low-memory target when Tethys loses focus and returns to the normal target when focus comes back, without suspending terminal processing.
@@ -87,7 +146,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Fullscreen mode now auto-hides the titlebar and dock while keeping both reachable by pointer.
 - Simplified the README around Tethys' current capabilities and removed competitor comparisons.
 
-### Fixed
+### Fixed — platform and lifecycle
 
 - Made terminal selections clearly visible in both active and inactive panels.
 - Reloading with F5 now refreshes only the focused embedded web panel instead of restarting Tethys.
@@ -119,6 +178,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Lazy-loaded terminal image support and stopped inactive file watchers, media polling, and audio work.
 - Ensured child shells are terminated when their panel or the app closes.
 
-[Unreleased]: https://github.com/QuangquyNguyenvo/Tethys/compare/v0.0.2...HEAD
-[0.0.2]: https://github.com/QuangquyNguyenvo/Tethys/compare/v0.0.1...v0.0.2
+[Unreleased]: https://github.com/QuangquyNguyenvo/Tethys/compare/v0.0.2-beta.1...HEAD
+[0.0.2-beta.1]: https://github.com/QuangquyNguyenvo/Tethys/compare/v0.0.1...v0.0.2-beta.1
 [0.0.1]: https://github.com/QuangquyNguyenvo/Tethys/releases/tag/v0.0.1

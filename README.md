@@ -1,182 +1,132 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Tethys logo, a tiling terminal workspace for AI coding agents on Windows" width="124" />
+  <img src="assets/logo.png" alt="Tethys logo" width="120" />
 
   # Tethys
 
-  **The all-in-one terminal workspace for AI coding agents.** ⋆｡°✩
-
-  Terminal, live file previews, and Git diffs all in one tiling window, so you're not alt-tabbing to see what your agent just did.
+  **A dedicated Linux-style tiling workspace on Windows, built for modern developers and AI agents.**
 
   [![Release](https://img.shields.io/github/v/release/QuangquyNguyenvo/Tethys?style=flat-square&color=818cf8)](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)
   [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-38bdf8?style=flat-square)](https://github.com/QuangquyNguyenvo/Tethys)
-  [![Tauri v2](https://img.shields.io/badge/Tauri-v2-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
-  [![Rust](https://img.shields.io/badge/Rust-ConPTY-dea584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
   [![License](https://img.shields.io/badge/License-MIT-a855f7?style=flat-square)](LICENSE)
 
   <br />
-  <img src="assets/divider.svg" width="65%" alt="" />
 </div>
 
-## What it does
+## Why Tethys
 
-Running `claude`, `codex`, `aider` (or any CLI agent) all day means it's constantly writing files, editing code, and dropping diffs, and you need to see the result *now*. Tethys watches your working directory and renders Markdown, images, and diffs the moment they land, right next to the terminal that produced them.
+Running CLI coding agents like Claude Code, Codex, or Aider means constant file edits, specs being generated, and background tasks executing simultaneously. On a traditional Windows setup, you often find yourself endlessly switching windows between terminals, editors, file explorers, and diff viewers just to track what changed. Managing multiple active tasks quickly turns into a cluttered screen of overlapping windows, leaving you wishing for the fluid tiling canvas and multi-workspace organization of a modern Linux environment.
 
-Everything lives on one tiling canvas: split panels, drag them around, resize freely. The terminal is a tile in your workspace, not the whole app.
+Tethys brings that missing experience directly to Windows. Everything lives on a unified tiling canvas where your shell, live file viewers, markdown documentation, and git diffs render immediately side by side. You stay in your flow and monitor agent progress effortlessly without juggling windows.
 
 <div align="center">
   <a href="assets/demo/tethys-demo.mp4">
-    <img src="assets/demo/tethys-demo.webp" alt="Tethys demo showing tiling panels, embedded web and file explorer views, Material You themes, and multiple workspaces" width="100%" />
+    <img src="assets/demo/tethys-demo.webp" alt="Tethys workspace demo" width="100%" />
   </a>
-  <br />
-  <sub>▶ Click the preview to watch the full 720p demo</sub>
 </div>
 
----
-
-## Features
+## Highlights
 
 <table>
   <tr>
     <td width="50%">
-      <h4>Live Agent Watcher</h4>
-      <p>The instant a file changes, Tethys renders the Markdown spec, image, or Git diff side by side. No manual refresh.</p>
+      <h3>Flexible Tiling Canvas</h3>
+      <p>Split panels horizontally or vertically, drag to rearrange, and resize freely. Keep your agent output, editor, and tools in a single unified view.</p>
     </td>
     <td width="50%">
-      <h4>Native ConPTY Terminal</h4>
-      <p>Direct <code>portable-pty</code> integration with an optimized binary channel for near-zero input latency.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <h4>Frictionless Tiling</h4>
-      <p>Split horizontally or vertically, drag to reorder, resize dynamically. Snap panels like native Windows tiling.</p>
-    </td>
-    <td width="50%">
-      <h4>Material You & Mica Glass</h4>
-      <p>Accent colors extracted from your wallpaper, paired with native Windows 11 Acrylic & Mica transparency.</p>
+      <h3>Instant Live Previews</h3>
+      <p>Inspect markdown documents, images, and file modifications the moment your agent creates or updates them, without manual refreshes.</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h4>WebGL-Accelerated Terminal</h4>
-      <p>Built on <code>xterm.js</code> + <code>@xterm/addon-webgl</code> for crisp text and smooth, high-FPS scrollback.</p>
+      <h3>Multiple Workspaces</h3>
+      <p>Keep independent project layouts running in parallel. Switch between dedicated workspaces smoothly using keyboard shortcuts.</p>
     </td>
     <td width="50%">
-      <h4>OSC 133 Command Blocks</h4>
-      <p>Semantic command isolation with exit-status badges and one-click output capture (PowerShell 7).</p>
+      <h3>Embedded Explorer & Web</h3>
+      <p>Browse project directories, inspect local ports, and view web previews directly alongside your terminal sessions.</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h4>Animated Workspaces</h4>
-      <p>Keep multiple terminal layouts alive and switch between them with number keys or a soft transition.</p>
+      <h3>Fast & Responsive Terminal</h3>
+      <p>Hardware-accelerated rendering with crisp text, smooth scrollback, and instant command feedback.</p>
     </td>
     <td width="50%">
-      <h4>Explorer & Embedded Web</h4>
-      <p>Browse files, copy paths, or open a URL and local previews without leaving the tiling canvas.</p>
+      <h3>Modern Adaptive Aesthetics</h3>
+      <p>Native Windows acrylic and mica effects paired with dynamic themes extracted directly from your wallpaper.</p>
     </td>
   </tr>
 </table>
-
-<details>
-<summary>Runs light, stays smooth</summary>
-<br />
-
-Hidden workspaces keep their PTY sessions alive but release WebGL textures until you switch back. SIXEL/iTerm image support loads on demand. PTY output uses bounded back-pressure, and file watchers are dropped once the last preview closes.
-
-Local regression snapshot on Windows (debug build, four idle terminals, measured after 10 seconds; app + WebView2 + console process tree):
-
-| Build | Working set | Private memory |
-| :--- | ---: | ---: |
-| Clean checkpoint `7c1194d` | 419.8 MB | 191.5 MB |
-| Optimized build, typical clean run | ~408 MB | ~187 MB |
-
-This is a repeatable development snapshot, not a universal guarantee. Wallpaper, GPU driver, WebView2 version, and open previews all affect the final number.
-</details>
-
----
 
 ## Interface
 
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="assets/screenshots/app-launch.webp" alt="Tethys opening to a new workspace" width="100%" />
-      <br /><sub><b>Launch instantly</b> — start with a terminal or file explorer.</sub>
+      <img src="assets/screenshots/app-launch.webp" alt="Tethys launch workspace" width="100%" />
+      <p><b>Launch Workspace</b><br />Start clean with terminal sessions and file navigation.</p>
     </td>
     <td width="50%" align="center">
-      <img src="assets/screenshots/workspace-switch.webp" alt="Tethys switched to another workspace with a different wallpaper" width="100%" />
-      <br /><sub><b>Switch workspaces</b> — keep separate layouts one click away.</sub>
+      <img src="assets/screenshots/workspace-switch.webp" alt="Tethys workspace switching" width="100%" />
+      <p><b>Workspace Management</b><br />Isolate different tasks across dedicated environments.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="assets/screenshots/settings.webp" alt="Tethys Appearance settings with Material You palette controls" width="100%" />
-      <br /><sub><b>Tune every detail</b> — colors, surfaces, layout, and shortcuts.</sub>
+      <img src="assets/screenshots/settings.webp" alt="Tethys appearance settings" width="100%" />
+      <p><b>Deep Customization</b><br />Adjust colors, surfaces, keyboard shortcuts, and behavior.</p>
     </td>
     <td width="50%" align="center">
-      <img src="assets/screenshots/wallpaper-theme.webp" alt="Tethys after changing to a red wallpaper and matching Material You theme" width="100%" />
-      <br /><sub><b>Make it yours</b> — wallpaper colors flow through the entire shell.</sub>
+      <img src="assets/screenshots/wallpaper-theme.webp" alt="Tethys dynamic wallpaper theming" width="100%" />
+      <p><b>Dynamic Theming</b><br />Seamless color palettes generated from your active wallpaper.</p>
     </td>
   </tr>
 </table>
 
----
+## Getting Started
 
-## Download & Setup
+Grab the latest release from [GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest). You can install Tethys using the standard Windows installer (`Tethys_x64.msi`) or download the portable package (`Tethys_portable.zip`) to extract and run anywhere without installation.
 
-Grab the latest build from **[GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)**:
-
-- **Installer (`.msi`)**: `Tethys_x64.msi`, standard Windows install.
-- **Portable (`.zip`)**: `Tethys_portable.zip`, extract and run `Tethys.exe`.
-
-> **Shell tip**: for the best OSC 133 command-block detection, run PowerShell 7:
-> ```powershell
-> winget install Microsoft.PowerShell
-> ```
-
----
-
-## Shortcuts
+## Essential Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
-| <kbd>Ctrl</kbd> + <kbd>K</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> / <kbd>F1</kbd> | Open Command Palette |
-| <kbd>Ctrl</kbd> + <kbd>T</kbd> / <kbd>Ctrl</kbd> + <kbd>W</kbd> | Open a terminal / close the active panel (configurable) |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd> / <kbd>O</kbd> | Place the active panel to the right / below |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | Duplicate the active panel in its current directory |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Tab</kbd> | Focus the next tiled panel |
-| <kbd>Win</kbd> + <kbd>Arrow Keys</kbd> / <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Arrow Keys</kbd> | Snap the active panel |
-| <kbd>Ctrl</kbd> + <kbd>1</kbd> / <kbd>Ctrl</kbd> + <kbd>3</kbd> | Previous / next workspace |
-| <kbd>Alt</kbd> + <kbd>1…9</kbd> | Jump directly to a workspace |
+| <kbd>Ctrl</kbd> + <kbd>K</kbd> / <kbd>F1</kbd> | Open Command Palette |
+| <kbd>Ctrl</kbd> + <kbd>T</kbd> / <kbd>Ctrl</kbd> + <kbd>W</kbd> | Open terminal / Close active panel |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd> / <kbd>O</kbd> | Split panel to the right / below |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | Duplicate active panel |
+| <kbd>Ctrl</kbd> + <kbd>Tab</kbd> | Focus next tiled panel |
+| <kbd>Win</kbd> + <kbd>Arrow Keys</kbd> | Snap active panel |
+| <kbd>Ctrl</kbd> + <kbd>1</kbd> / <kbd>Ctrl</kbd> + <kbd>3</kbd> | Switch to previous / next workspace |
+| <kbd>Alt</kbd> + <kbd>1...9</kbd> | Jump to workspace 1 to 9 |
 | <kbd>Ctrl</kbd> + <kbd>,</kbd> | Open Settings |
-| <kbd>F11</kbd> / <kbd>Alt</kbd> + <kbd>Enter</kbd> | Toggle native fullscreen |
-
----
+| <kbd>F11</kbd> | Toggle Fullscreen |
 
 <details>
-<summary><b>Build from Source (Developers)</b></summary>
+<summary><b>Build from Source</b></summary>
 
 <br />
 
-**Prerequisites**: Node.js 20.19+, stable Rust (`rustup`), Visual Studio C++ Build Tools.
+Prerequisites: Node.js 20+, Rust, Visual Studio C++ Build Tools.
 
 ```bash
-# Clone & install dependencies
 git clone https://github.com/QuangquyNguyenvo/Tethys.git
 cd Tethys/app
 npm install
-
-# Start development mode
 npm run tauri dev
+```
 
-# Build release bundle
+To build a release package:
+
+```bash
 npm run tauri build
 ```
+
 </details>
 
 ---
 
 <div align="center">
-  <sub>MIT Licensed · Built with 💜 by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a></sub>
+  MIT License · Created with passion by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a>
 </div>

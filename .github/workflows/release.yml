@@ -36,7 +36,7 @@ jobs:
         with:
           projectPath: app
           tagName: ${{ github.ref_name }}
-          releaseName: "Tethys ${{ github.ref_name }} (Beta)"
-          releaseBody: "Automated build from CI. Download `*-setup.exe` (recommended) or the `.msi` below."
+          releaseName: "Tethys ${{ github.ref_name }}"
+          releaseBody: "Windows build from CI. Download `*-setup.exe` (recommended) or the `.msi` below. See `CHANGELOG.md` for measured and estimated performance notes."
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
