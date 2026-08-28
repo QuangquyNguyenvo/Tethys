@@ -1696,76 +1696,74 @@ body.dragging-panel * {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  /* Thẻ phải tự xếp lại theo bề ngang của *ô* chứ không phải của cửa sổ: một panel hẹp
+     nằm trong cửa sổ rộng vẫn cần bản xếp dọc. Đó là việc của container query. */
+  container-type: inline-size;
 }
 
-/* Một mặt phẳng đục, không viền. Viền cộng nền là hai lần vẽ cùng một ranh giới; trên ảnh
-   nền nhiều chi tiết thì khối màu đặc đã tách bạch rồi, thêm đường kẻ chỉ thành khung tranh. */
+/* Nằm ngang: icon một cột, chữ và nút một cột. Bản trước xếp dọc và căn giữa nên thẻ cao
+   hơn rộng — một cột chữ hẹp giữa màn hình thì tiêu đề, dòng phụ, nút và gợi ý phải xuống
+   dòng bốn lần, và mắt phải quét từ trên xuống thay vì đọc một hàng.
+   Không viền: viền cộng nền là vẽ hai lần cùng một ranh giới. */
 .empty-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 40px 36px 32px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-items: start;
+  column-gap: 26px;
+  row-gap: 18px;
+  width: min(100%, 540px);
+  padding: 30px 32px;
   border-radius: var(--r-xxl);
   background: var(--ui-surface-container-low);
-  max-width: 400px;
-  width: 100%;
 }
 
-/* Đĩa tông màu: `primary-container` với icon `on-primary-container` là cặp M3 dành cho
-   biểu tượng dẫn hướng — đủ nổi để làm điểm neo cho mắt mà vẫn không trông như nút bấm. */
+/* Icon trần, không đĩa nền. Đĩa là thêm một cái hộp nữa cho một thứ vốn đã là hình khối;
+   ở cỡ 44px và màu `primary` thì nó tự đủ nổi để làm điểm neo bên trái. */
 .empty-icon {
-  width: 76px;
-  height: 76px;
-  border-radius: var(--r-full);
-  background: var(--ui-primary-container);
-  color: var(--ui-on-primary-container);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 22px;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: center;
+  color: var(--ui-primary);
 }
 
-/* headline-small. M3 để tiêu đề ở nét thường và dựa vào *cỡ chữ* để phân cấp; ở 24px mà
-   còn in đậm thì chỉ nặng thêm chứ không rõ hơn. Bản trước là 16px/600 — đậm để bù cho
-   việc quá nhỏ. */
+.empty-text,
+.empty-actions,
+.empty-hints { grid-column: 2; }
+
+/* title-large. M3 phân cấp bằng cỡ chữ chứ không bằng độ đậm; bản đầu là 16px/600 — in
+   đậm để bù cho việc quá nhỏ. */
 .empty-card h3 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 400;
   line-height: 1.25;
   letter-spacing: 0;
   color: var(--ui-on-surface);
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
-
-/* body-medium. `max-width` theo số ký tự chứ không theo pixel: dòng phụ này luôn xuống
-   dòng ở chỗ đọc thuận nhất bất kể thẻ rộng bao nhiêu. */
 .empty-card p {
   font-size: 14px;
   line-height: 1.45;
   color: var(--ui-on-surface-variant);
-  margin-bottom: 28px;
-  max-width: 32ch;
 }
 
-/* Nút rộng vừa bằng nhãn của nó, không giãn đều nhau. Hai nút chia đôi hết bề ngang thẻ
-   đọc ra là một thanh bị cắt làm hai, và ngụ ý hai việc quan trọng ngang nhau — trong khi
-   mở terminal mới là việc gần như ai cũng chọn. */
+/* Nút rộng vừa bằng nhãn. Giãn đều hết bề ngang thì đọc ra là một thanh bị cắt làm hai,
+   và ngụ ý hai việc quan trọng ngang nhau — trong khi mở terminal là việc gần như ai
+   cũng chọn. */
 .empty-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 10px;
 }
 .empty-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 22px 0 18px;
+  height: 40px;
+  padding: 0 20px 0 16px;
   border: none;
   border-radius: var(--r-full);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.1px;
   cursor: pointer;
@@ -1795,30 +1793,49 @@ body.dragging-panel * {
   background: color-mix(in srgb, var(--ui-on-secondary-container) 12%, var(--ui-secondary-container));
 }
 
-/* Hai gợi ý là hai dòng riêng. Bản trước nhồi cả hai vào một dòng 11px ngăn bằng dấu chấm
-   giữa, nên phải đọc kỹ mới tách được đâu là phím và đâu là việc mà phím đó làm. */
+/* Hai gợi ý trên một hàng, cách nhau bằng khoảng trống chứ không bằng dấu chấm giữa: chỗ
+   nghỉ đã đủ nói đây là hai ý, thêm ký tự phân cách chỉ là thêm thứ để đọc. */
 .empty-hints {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 28px;
-  font-size: 13px;
+  gap: 6px 18px;
+  font-size: 12.5px;
   color: var(--ui-on-surface-variant);
 }
 .empty-hints span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 .empty-hints kbd {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1;
-  padding: 5px 8px;
+  padding: 4px 7px;
   border-radius: var(--r-xs);
   background: var(--ui-surface-container-high);
   color: var(--ui-on-surface);
+}
+
+/* Ô hẹp thì không còn chỗ cho hai cột — quay về xếp dọc, căn giữa. */
+@container (max-width: 470px) {
+  .empty-card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    justify-items: center;
+    text-align: center;
+    row-gap: 16px;
+  }
+  .empty-icon {
+    grid-row: auto;
+    align-self: auto;
+  }
+  .empty-text,
+  .empty-actions,
+  .empty-hints { grid-column: 1; }
+  .empty-actions,
+  .empty-hints { justify-content: center; }
 }
 
 /* ==========================================================================

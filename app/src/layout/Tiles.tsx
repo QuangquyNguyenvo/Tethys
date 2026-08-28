@@ -551,18 +551,18 @@ function EmptyState({ onTerminal, onFiles }: { onTerminal: () => void; onFiles: 
   return (
     <div className="empty-workspace">
       <div className="empty-card">
-        <div className="empty-icon">
-          <Icon name="terminal" size={36} />
+        <Icon name="terminal" size={44} className="empty-icon" />
+        <div className="empty-text">
+          <h3>Workspace is empty</h3>
+          <p>Open a terminal or preview a document to get started</p>
         </div>
-        <h3>Workspace is empty</h3>
-        <p>Open a terminal or preview a document to get started</p>
         <div className="empty-actions">
           <button className="empty-btn primary" onClick={onTerminal}>
-            <Icon name="add" size={20} />
+            <Icon name="add" size={18} />
             <span>New terminal</span>
           </button>
           <button className="empty-btn secondary" onClick={onFiles}>
-            <Icon name="folder" size={20} />
+            <Icon name="folder" size={18} />
             <span>Browse files</span>
           </button>
         </div>

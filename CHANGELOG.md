@@ -14,11 +14,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Shortened the layout and workspace transitions. A panel is the only thing moving on
   screen, so half a second only read as sluggish: a panel reaches its new place in 320ms,
   a workspace arrives in 380ms and leaves in 200ms.
-- Rebuilt the empty-workspace card around Material 3's type scale. The heading is
-  headline-small at a regular weight instead of 16px bold, the icon sits on a tonal
-  primary-container disc, buttons are 44px tall and only as wide as their labels, and the
-  two keyboard hints are separate lines rather than one 11px run split by a middle dot.
-  Its border is gone: a filled surface and an outline draw the same edge twice.
+- Rebuilt the empty-workspace card as a landscape one: the icon holds a column of its own
+  and everything else reads as rows beside it, instead of a narrow centred stack that wrapped
+  four times. It follows Material 3's type scale rather than compensating for small type with
+  bold weight, the icon stands on its own instead of on a tonal disc, buttons are only as wide
+  as their labels, and the keyboard hints are separated by space instead of a middle dot. The
+  border is gone: a filled surface and an outline draw the same edge twice. A container query
+  returns it to the stacked layout inside a narrow panel.
 - The top bar follows Material You the way Settings already does. Workspace, window and
   add-workspace icons come from Material Symbols and the active workspace switches to the
   filled variant, so which tab is open reads from the icon's shape rather than from a tint.
