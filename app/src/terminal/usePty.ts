@@ -253,16 +253,6 @@ export function usePty(host: React.RefObject<HTMLDivElement | null>, opts: PtyOp
     let resizeTimer: number | null = null;
     let resizeFrame: number | null = null;
     const fitAtNextFrame = () => {
-      // Trong lúc panel đang nội suy kích thước, `fit()` mỗi khung hình là thứ đắt nhất
-      // trong cả tệp này: hễ cols/rows đổi là xterm dồn lại **toàn bộ** scrollback (mặc
-      // định 5000 dòng) rồi cấp lại texture WebGL. Ba mươi lần như thế trong một hoạt ảnh
-      // thì không có hoạt ảnh nào mượt nổi. Chờ layout đứng yên rồi fit đúng một lần; giữa
-      // chừng chữ đứng yên và bị `overflow: hidden` của panel cắt bớt — y hệt lúc kéo mép
-      // cửa sổ, và không ai đọc chữ trong 300ms đó cả.
-      if (document.body.classList.contains("layout-anim")) {
-        resizeFrame = requestAnimationFrame(fitAtNextFrame);
-        return;
-      }
       resizeFrame = null;
       try {
         fit.fit();

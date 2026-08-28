@@ -11,7 +11,7 @@ import {
   type Rect,
 } from "./geometry";
 import { setSnapshot } from "./snapshot";
-import { Folder, Plus, Terminal } from "lucide-react";
+import { Icon } from "../ui/Icon";
 
 // Terminal is the default view, while the auxiliary panels load on demand. This keeps the
 // initial renderer path smaller without changing the lifetime of already-open panels.
@@ -75,10 +75,10 @@ export function Tiles({ theme }: Props) {
     let previous: Rect | null = null;
     let settle: number | null = null;
 
-    // Panel nội suy kích thước (`.panel-host` trong `App.css`), nhưng chỉ khi hình học đổi
-    // vì *cây layout* đổi. Cửa sổ bị kéo mép thì mọi panel đổi cỡ liên tục theo tay người
-    // dùng; để transition chạy lúc đó là panel lết theo sau mép cửa sổ nửa giây một.
-    // Cờ này tắt nội suy trong lúc kéo và bật lại khi kích thước đứng yên.
+    // Thanh chia trượt tới vị trí mới (`.gutter` trong `App.css`), nhưng chỉ khi hình học
+    // đổi vì *cây layout* đổi. Kéo mép cửa sổ thì mọi thanh chia dời chỗ liên tục theo tay
+    // người dùng; để transition chạy lúc đó là chúng lết theo sau mép cửa sổ.
+    // Cờ này tắt transition trong lúc kéo và bật lại khi kích thước đứng yên.
     const markWindowResize = () => {
       document.body.classList.add("resizing-window");
       if (settle !== null) window.clearTimeout(settle);
@@ -115,35 +115,6 @@ export function Tiles({ theme }: Props) {
     () => computeLayout(tree, { x: 0, y: 0, w: box.w, h: box.h }),
     [tree, box.w, box.h],
   );
-
-  // Cờ "layout đang chạy hoạt ảnh". Chỉ bật khi *cây layout* đổi — chia đôi, đóng panel,
-  // hoán vị — tức đúng những lúc `.panel-host` nội suy kích thước. `usePty.ts` đọc cờ này
-  // để hoãn `fit()` của xterm cho tới khi mọi thứ đứng yên.
-  //
-  // Kéo thanh chia và kéo thả panel cũng đổi cây, mỗi khung hình một lần, nhưng ở đó
-  // transition đã tắt và chữ phải bám tay người dùng — nên loại trừ, nếu không terminal
-  // sẽ đứng hình suốt cả thao tác kéo.
-  const treeRef = useRef(tree);
-  const layoutAnimTimerRef = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    const changed = treeRef.current !== tree;
-    treeRef.current = tree;
-    if (!changed) return;
-    const body = document.body;
-    if (body.classList.contains("resizing-layout") || body.classList.contains("dragging-panel")) {
-      return;
-    }
-    body.classList.add("layout-anim");
-    if (layoutAnimTimerRef.current !== null) window.clearTimeout(layoutAnimTimerRef.current);
-    layoutAnimTimerRef.current = window.setTimeout(() => {
-      layoutAnimTimerRef.current = null;
-      body.classList.remove("layout-anim");
-    }, LAYOUT_MOTION_MS + 60);
-  }, [tree]);
-  useEffect(() => () => {
-    if (layoutAnimTimerRef.current !== null) window.clearTimeout(layoutAnimTimerRef.current);
-    document.body.classList.remove("layout-anim");
-  }, []);
 
   // Store cần hình học này để tính đích thả mà không phải import ngược lên đây.
   useEffect(() => {
@@ -581,22 +552,31 @@ function EmptyState({ onTerminal, onFiles }: { onTerminal: () => void; onFiles: 
     <div className="empty-workspace">
       <div className="empty-card">
         <div className="empty-icon">
-          <Terminal size={30} strokeWidth={1.8} />
+          <Icon name="terminal" size={36} />
         </div>
         <h3>Workspace is empty</h3>
         <p>Open a terminal or preview a document to get started</p>
         <div className="empty-actions">
           <button className="empty-btn primary" onClick={onTerminal}>
-            <Plus size={14} />
-            <span>Open new terminal</span>
+            <Icon name="add" size={20} />
+            <span>New terminal</span>
           </button>
           <button className="empty-btn secondary" onClick={onFiles}>
-            <Folder size={14} />
+            <Icon name="folder" size={20} />
             <span>Browse files</span>
           </button>
         </div>
         <div className="empty-hints">
-          <span><kbd>Ctrl+K</kbd> Command palette · <kbd>Win + ← ↑ ↓ →</kbd> Snap panel</span>
+          <span>
+            <kbd>Ctrl</kbd>
+            <kbd>K</kbd>
+            Command palette
+          </span>
+          <span>
+            <kbd>Win</kbd>
+            <kbd>← ↑ ↓ →</kbd>
+            Snap panel
+          </span>
         </div>
       </div>
     </div>

@@ -517,23 +517,17 @@ body {
   min-width: 0;
   min-height: 0;
   contain: layout paint style;
-  /* Vị trí đi bằng FLIP ở `.panel-motion` bên trong (xem `Tiles.tsx`): `transform` của
-     chính phần tử này nhảy một phát tới toạ độ mới, nên **không** được transition ở đây,
-     nếu không cùng một quãng đường bị vẽ hai lần.
+  /* Không có transition nào ở đây, cả vị trí lẫn kích thước.
 
-     Kích thước thì ngược lại — nó không đi qua FLIP nào cả. Trước đây nó nhảy: chia đôi
-     một panel là panel cũ co lại tức thì trong khi nó vẫn đang trượt sang chỗ mới, hai
-     nửa của cùng một chuyển động chạy ở hai tốc độ khác nhau. Nội suy nó ở đây khiến cả
-     hai đi cùng nhịp.
+     Vị trí đi bằng FLIP ở `.panel-motion` bên trong (xem `Tiles.tsx`): `transform` của
+     chính phần tử này nhảy một phát tới toạ độ mới, nếu transition thì cùng một quãng
+     đường bị vẽ hai lần.
 
-     Cái giá của việc này là mỗi khung hình phải layout lại — chấp nhận được, `contain`
-     chặn không cho lan ra ngoài panel. Cái *không* chấp nhận được là xterm `fit()` theo:
-     đổi cols/rows là dồn lại toàn bộ scrollback rồi cấp lại texture WebGL, ba mươi lần
-     liên tiếp. `Tiles.tsx` bật cờ `body.layout-anim` suốt hoạt ảnh và `usePty.ts` hoãn
-     `fit()` tới khi cờ tắt, nên cả quãng chỉ còn đúng một lần đo lại. */
-  transition:
-    width var(--motion-layout) var(--e-layout),
-    height var(--motion-layout) var(--e-layout);
+     Kích thước từng được nội suy ở đây và đã bị bỏ. Nó là thứ duy nhất trong cả giao diện
+     bắt chạy lại *layout* mỗi khung hình, và mỗi lần như thế xterm đo lại: đổi số cột hay
+     dòng là dồn lại toàn bộ scrollback rồi cấp lại texture WebGL. Không có mẹo nào làm nó
+     rẻ đi — hoãn phép đo thì trong lúc động chữ đứng yên và bị cắt, tức là cái đang nội
+     suy chẳng còn là nội dung nữa. Panel đổi cỡ tức thì; chỉ vị trí là trượt. */
 }
 
 /* `paint` containment clips the backdrop sampling area at the tile boundary. WebView2
@@ -544,20 +538,15 @@ body {
   contain: layout style;
 }
 
-/* Kéo gutter, kéo panel, và đổi kích thước cửa sổ đều phải bám tay tức thì — có
-   transition là thành cao su, panel lết theo sau mép cửa sổ nửa giây. */
-/* Đổi workspace cũng vậy, nhưng vì lý do khác. Panel của workspace đang ẩn giữ lại khung
-   cuối cùng của nó; nếu cửa sổ đổi kích thước trong lúc nó ẩn, khung đó đã cũ. Quay về tab
-   ấy là panel nhận kích thước mới — và nếu nội suy, nó sẽ *phình ra* ngay giữa lúc đang
-   trượt vào, trông như một trục trặc chứ không phải một chuyển động. */
-.tiles.ws-switch .panel-host,
-body.resizing-layout .panel-host,
-body.dragging-panel .panel-host,
-body.resizing-window .panel-host,
+/* Thanh chia trượt theo panel, trừ bốn lúc nó phải đứng đúng chỗ ngay lập tức: kéo chính
+   nó, kéo thả panel, kéo mép cửa sổ — cả ba đều phải bám tay, có transition là thành cao su
+   — và lúc đổi workspace, vì cây layout đổi hẳn nên thanh chia của workspace mới không
+   "đi" từ chỗ của thanh chia cũ, nó chỉ đơn giản là một cái khác. */
+.tiles.ws-switch .gutter,
 body.resizing-layout .gutter,
 body.dragging-panel .gutter,
 body.resizing-window .gutter,
-.tiles.is-dragging .panel-host { transition: none; }
+.tiles.is-dragging .gutter { transition: none; }
 
 /* Panel của workspace khác: vẫn sống, vẫn giữ kích thước, chỉ không nhìn thấy.
    `display:none` sẽ làm xterm đo được 0×0 rồi fit sai khi quay lại tab. */
@@ -1064,10 +1053,7 @@ body.dragging-panel .iconbtn.move-handle { cursor: grabbing; }
   /* Thanh chia không có lớp FLIP nào, nên ở đây `transform` được nội suy trực tiếp. Cùng
      thời lượng và cùng đường cong với panel: nếu nó tới đích trước, mắt thấy một đường kẻ
      đứng chờ giữa hai panel còn đang trượt. */
-  transition:
-    transform var(--motion-layout) var(--e-layout),
-    width var(--motion-layout) var(--e-layout),
-    height var(--motion-layout) var(--e-layout);
+  transition: transform var(--motion-layout) var(--e-layout);
 }
 /* ── Settings — popup, không còn là panel trong tile ────────────────
    Từng là một block trong lưới, tự lo responsive theo bề ngang panel và dồn chữ thành
@@ -1711,74 +1697,128 @@ body.dragging-panel * {
   justify-content: center;
   padding: 24px;
 }
+
+/* Một mặt phẳng đục, không viền. Viền cộng nền là hai lần vẽ cùng một ranh giới; trên ảnh
+   nền nhiều chi tiết thì khối màu đặc đã tách bạch rồi, thêm đường kẻ chỉ thành khung tranh. */
 .empty-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 34px 38px;
-  border-radius: var(--r-xl);
+  padding: 40px 36px 32px;
+  border-radius: var(--r-xxl);
   background: var(--ui-surface-container-low);
-  border: 1px solid var(--ui-outline-variant);
-  max-width: 430px;
+  max-width: 400px;
   width: 100%;
 }
+
+/* Đĩa tông màu: `primary-container` với icon `on-primary-container` là cặp M3 dành cho
+   biểu tượng dẫn hướng — đủ nổi để làm điểm neo cho mắt mà vẫn không trông như nút bấm. */
 .empty-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: var(--r-lg);
-  background: var(--ui-surface-container-high);
-  color: var(--ui-primary);
+  width: 76px;
+  height: 76px;
+  border-radius: var(--r-full);
+  background: var(--ui-primary-container);
+  color: var(--ui-on-primary-container);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 22px;
 }
+
+/* headline-small. M3 để tiêu đề ở nét thường và dựa vào *cỡ chữ* để phân cấp; ở 24px mà
+   còn in đậm thì chỉ nặng thêm chứ không rõ hơn. Bản trước là 16px/600 — đậm để bù cho
+   việc quá nhỏ. */
 .empty-card h3 {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0;
   color: var(--ui-on-surface);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
+
+/* body-medium. `max-width` theo số ký tự chứ không theo pixel: dòng phụ này luôn xuống
+   dòng ở chỗ đọc thuận nhất bất kể thẻ rộng bao nhiêu. */
 .empty-card p {
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.45;
   color: var(--ui-on-surface-variant);
-  margin-bottom: 20px;
+  margin-bottom: 28px;
+  max-width: 32ch;
 }
-.empty-actions { display: flex; gap: 10px; width: 100%; }
-.empty-btn {
-  flex: 1;
+
+/* Nút rộng vừa bằng nhãn của nó, không giãn đều nhau. Hai nút chia đôi hết bề ngang thẻ
+   đọc ra là một thanh bị cắt làm hai, và ngụ ý hai việc quan trọng ngang nhau — trong khi
+   mở terminal mới là việc gần như ai cũng chọn. */
+.empty-actions {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: 10px;
+}
+.empty-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  height: 36px;
+  height: 44px;
+  padding: 0 22px 0 18px;
   border: none;
   border-radius: var(--r-full);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
   cursor: pointer;
-  transition:
-    background var(--motion-fast) var(--e-standard),
-    transform var(--motion-medium) var(--e-spring);
+  transition: background var(--motion-fast) var(--e-standard);
 }
-.empty-btn.primary { background: var(--ui-primary); color: var(--ui-on-primary); }
-.empty-btn.primary:hover { background: var(--ui-primary-container); color: var(--ui-on-primary-container); }
-.empty-btn.secondary { background: var(--ui-surface-container-high); color: var(--ui-on-surface); }
-.empty-btn.secondary:hover { background: var(--ui-surface-container-highest); }
-.empty-btn:hover { transform: translateY(-2px); }
-.empty-btn:active { transform: scale(0.96); }
+.empty-btn svg { flex: none; }
+/* Trạng thái là một lớp màu phủ lên chính nền nút (8% khi rê, 12% khi nhấn) — cách M3 làm.
+   Bản trước nhấc nút lên 2px rồi bóp lại 4%: hai chuyển động cho một cái nút đứng yên. */
+.empty-btn.primary {
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+}
+.empty-btn.primary:hover {
+  background: color-mix(in srgb, var(--ui-on-primary) 8%, var(--ui-primary));
+}
+.empty-btn.primary:active {
+  background: color-mix(in srgb, var(--ui-on-primary) 12%, var(--ui-primary));
+}
+.empty-btn.secondary {
+  background: var(--ui-secondary-container);
+  color: var(--ui-on-secondary-container);
+}
+.empty-btn.secondary:hover {
+  background: color-mix(in srgb, var(--ui-on-secondary-container) 8%, var(--ui-secondary-container));
+}
+.empty-btn.secondary:active {
+  background: color-mix(in srgb, var(--ui-on-secondary-container) 12%, var(--ui-secondary-container));
+}
+
+/* Hai gợi ý là hai dòng riêng. Bản trước nhồi cả hai vào một dòng 11px ngăn bằng dấu chấm
+   giữa, nên phải đọc kỹ mới tách được đâu là phím và đâu là việc mà phím đó làm. */
 .empty-hints {
-  margin-top: 18px;
-  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  font-size: 13px;
   color: var(--ui-on-surface-variant);
-  opacity: 0.8;
+}
+.empty-hints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .empty-hints kbd {
   font-family: var(--font-mono);
-  padding: 2px 5px;
+  font-size: 11.5px;
+  line-height: 1;
+  padding: 5px 8px;
   border-radius: var(--r-xs);
-  background: var(--ui-surface-container-highest);
+  background: var(--ui-surface-container-high);
+  color: var(--ui-on-surface);
 }
 
 /* ==========================================================================
