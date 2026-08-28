@@ -1,0 +1,80 @@
+<svg width="100%" height="24" viewBox="0 0 600 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Wave Gradient: Soft Cyan -> Teal -> Lavender -> Transparent ends -->
+    <linearGradient id="mini-wave-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0" />
+      <stop offset="25%" stop-color="#38bdf8" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#53d7d6" stop-opacity="0.85" />
+      <stop offset="75%" stop-color="#818cf8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Laser Beam Pulse -->
+    <linearGradient id="mini-laser-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Central Pearl Glow -->
+    <radialGradient id="mini-pearl-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#53d7d6" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="mini-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <style>
+      @keyframes mini-laser-flow {
+        0% { stroke-dashoffset: 240; opacity: 0.2; }
+        50% { opacity: 0.9; }
+        100% { stroke-dashoffset: -240; opacity: 0.2; }
+      }
+      @keyframes mini-pearl-breath {
+        0%, 100% { transform: scale(0.85); opacity: 0.5; }
+        50% { transform: scale(1.2); opacity: 1; }
+      }
+      .anim-mini-laser {
+        stroke-dasharray: 40 180;
+        animation: mini-laser-flow 3.6s linear infinite;
+      }
+      .anim-mini-pearl {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: mini-pearl-breath 3s ease-in-out infinite;
+      }
+    </style>
+  </defs>
+
+  <!-- Base Gentle Wave Filament -->
+  <path d="M 60 12 Q 180 5, 300 12 T 540 12"
+        stroke="url(#mini-wave-grad)"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        fill="none" />
+
+  <!-- Animated Laser Beam Runner -->
+  <path class="anim-mini-laser"
+        d="M 60 12 Q 180 5, 300 12 T 540 12"
+        stroke="url(#mini-laser-grad)"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        fill="none"
+        filter="url(#mini-glow)" />
+
+  <!-- Satellite Luminous Beads -->
+  <circle cx="210" cy="10" r="1.5" fill="#38bdf8" opacity="0.75" />
+  <circle cx="390" cy="10" r="1.5" fill="#818cf8" opacity="0.75" />
+
+  <!-- Central Glowing Beacon -->
+  <circle class="anim-mini-pearl" cx="300" cy="12" r="8" fill="url(#mini-pearl-glow)" />
+  <circle cx="300" cy="12" r="2.8" fill="#53d7d6" filter="url(#mini-glow)" />
+  <circle cx="300" cy="12" r="1.2" fill="#ffffff" />
+</svg>
