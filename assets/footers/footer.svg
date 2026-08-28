@@ -1,0 +1,68 @@
+<svg width="800" height="36" viewBox="0 0 800 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ftr-wave-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0" />
+      <stop offset="20%" stop-color="#38bdf8" stop-opacity="0.3" />
+      <stop offset="50%" stop-color="#818cf8" stop-opacity="0.8" />
+      <stop offset="80%" stop-color="#c084fc" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0" />
+    </linearGradient>
+
+    <radialGradient id="ftr-orb" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.7" />
+      <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="ftr-fx-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <style>
+      @keyframes ftr-wave-drift {
+        0%, 100% { transform: translateY(0px); opacity: 0.4; }
+        50% { transform: translateY(-2px); opacity: 0.85; }
+      }
+      @keyframes ftr-pulse {
+        0%, 100% { opacity: 0.4; transform: scale(0.85); }
+        50% { opacity: 1; transform: scale(1.15); }
+      }
+      @keyframes ftr-beam {
+        0% { stroke-dashoffset: 300; opacity: 0.2; }
+        50% { opacity: 1; }
+        100% { stroke-dashoffset: -300; opacity: 0.2; }
+      }
+      .ftr-w1 {
+        transform-origin: 400px 18px;
+        animation: ftr-wave-drift 4s ease-in-out infinite;
+      }
+      .ftr-w2 {
+        transform-origin: 400px 18px;
+        animation: ftr-wave-drift 4s ease-in-out infinite 1.5s;
+      }
+      .ftr-dot {
+        transform-origin: 400px 18px;
+        animation: ftr-pulse 3s ease-in-out infinite;
+      }
+      .ftr-laser {
+        stroke-dasharray: 50 250;
+        animation: ftr-beam 4s linear infinite;
+      }
+    </style>
+  </defs>
+
+  <!-- Ambient Glow -->
+  <circle class="ftr-dot" cx="400" cy="18" r="14" fill="url(#ftr-orb)" />
+
+  <!-- Harmonic Sine Waves (AsciiAudioWave/Oceanic motif) -->
+  <path class="ftr-w1" d="M 80 18 Q 160 10, 240 18 T 400 18 T 560 18 T 640 26 T 720 18" stroke="url(#ftr-wave-grad)" stroke-width="1.5" fill="none" stroke-linecap="round" />
+  <path class="ftr-w2" d="M 80 18 Q 160 26, 240 18 T 400 18 T 560 18 T 640 10 T 720 18" stroke="url(#ftr-wave-grad)" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.6" />
+
+  <!-- Laser Beam Passing Across -->
+  <path class="ftr-laser" d="M 80 18 Q 160 10, 240 18 T 400 18 T 560 18 T 640 26 T 720 18" stroke="#53d7d6" stroke-width="1.8" fill="none" stroke-linecap="round" filter="url(#ftr-fx-glow)" />
+
+  <!-- Central Micro Jewel -->
+  <circle cx="400" cy="18" r="2.5" fill="#818cf8" filter="url(#ftr-fx-glow)" />
+  <circle cx="400" cy="18" r="1" fill="#ffffff" />
+</svg>
