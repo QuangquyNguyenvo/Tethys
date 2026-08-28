@@ -1,28 +1,39 @@
+<img src="assets/headers/header.svg" alt="Tethys Wave Header" width="100%" />
+
 <div align="center">
+  <br />
   <img src="assets/logo.png" alt="Tethys logo" width="120" />
 
-  # Tethys
+  # 🪼 Tethys 🌊
 
   **A dedicated Linux-style tiling workspace on Windows, built for modern developers and AI agents.**
 
-  [![Release](https://img.shields.io/github/v/release/QuangquyNguyenvo/Tethys?style=flat-square&color=818cf8)](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)
-  [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-38bdf8?style=flat-square)](https://github.com/QuangquyNguyenvo/Tethys)
-  [![License](https://img.shields.io/badge/License-MIT-a855f7?style=flat-square)](LICENSE)
+  [![Release](https://img.shields.io/github/v/release/QuangquyNguyenvo/Tethys?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1527&color=818cf8)](https://github.com/QuangquyNguyenvo/Tethys/releases/latest)
+  [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-38bdf8?style=for-the-badge&logo=windows11&logoColor=white&labelColor=0d1527)](https://github.com/QuangquyNguyenvo/Tethys)
+  [![License](https://img.shields.io/badge/License-MIT-c084fc?style=for-the-badge&logo=opensourceinitiative&logoColor=white&labelColor=0d1527)](LICENSE)
 
-  <br />
+  <br /><br />
+
+  <img src="assets/dividers/divider.svg" width="100%" />
 </div>
 
 ## Why Tethys
 
-Running CLI coding agents like Claude Code, Codex, or Aider means constant file edits, specs being generated, and background tasks executing simultaneously. On a traditional Windows setup, you often find yourself endlessly switching windows between terminals, editors, file explorers, and diff viewers just to track what changed. Managing multiple active tasks quickly turns into a cluttered screen of overlapping windows, leaving you wishing for the fluid tiling canvas and multi-workspace organization of a modern Linux environment.
+**Coding with AI agents changes how we interact with our workspace.**
 
-Tethys brings that missing experience directly to Windows. Everything lives on a unified tiling canvas where your shell, live file viewers, markdown documentation, and git diffs render immediately side by side. You stay in your flow and monitor agent progress effortlessly without juggling windows.
+When tools like `claude`, `codex`, or `aider` write code, modify specs, and run background jobs all at once, a standard terminal is no longer enough. On Windows, tracking these actions usually means endless Alt-Tabbing across editors, diff tools, and file explorers just to see what the agent changed.
+
+**Tethys brings the power and fluid tiling of a Linux desktop directly to Windows.**
+
+Terminal sessions, live markdown previews, image inspectors, and git diffs live together on one responsive canvas. The instant an agent updates a file or drops a diff, it renders side by side in real time, keeping you completely in your flow without overlapping window clutter.
 
 <div align="center">
   <a href="assets/demo/tethys-demo.mp4">
     <img src="assets/demo/tethys-demo.webp" alt="Tethys workspace demo" width="100%" />
   </a>
 </div>
+
+<img src="assets/dividers/divider.svg" width="100%" />
 
 ## Highlights
 
@@ -59,34 +70,46 @@ Tethys brings that missing experience directly to Windows. Everything lives on a
   </tr>
 </table>
 
+<img src="assets/dividers/divider.svg" width="100%" />
+
 ## Interface
 
 <table>
   <tr>
     <td width="50%" align="center">
       <img src="assets/screenshots/app-launch.webp" alt="Tethys launch workspace" width="100%" />
-      <p><b>Launch Workspace</b><br />Start clean with terminal sessions and file navigation.</p>
+      <p><b>Launch Workspace</b><br />Clean terminal sessions and file navigation.</p>
     </td>
     <td width="50%" align="center">
       <img src="assets/screenshots/workspace-switch.webp" alt="Tethys workspace switching" width="100%" />
-      <p><b>Workspace Management</b><br />Isolate different tasks across dedicated environments.</p>
+      <p><b>Workspace Management</b><br />Isolate tasks across dedicated workspaces.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <img src="assets/screenshots/settings.webp" alt="Tethys appearance settings" width="100%" />
-      <p><b>Deep Customization</b><br />Adjust colors, surfaces, keyboard shortcuts, and behavior.</p>
+      <p><b>Deep Customization</b><br />Fine-tune colors, surfaces, and shortcuts.</p>
     </td>
     <td width="50%" align="center">
       <img src="assets/screenshots/wallpaper-theme.webp" alt="Tethys dynamic wallpaper theming" width="100%" />
-      <p><b>Dynamic Theming</b><br />Seamless color palettes generated from your active wallpaper.</p>
+      <p><b>Dynamic Theming</b><br />Adaptive palettes from your wallpaper.</p>
     </td>
   </tr>
 </table>
 
+<img src="assets/dividers/divider.svg" width="100%" />
+
 ## Getting Started
 
-Grab the latest release from [GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest). You can install Tethys using the standard Windows installer (`Tethys_x64.msi`) or download the portable package (`Tethys_portable.zip`) to extract and run anywhere without installation.
+Download the latest release from [GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest). Choose the package that best fits your workflow:
+
+| Package | File | Best For | Description |
+| :--- | :--- | :--- | :--- |
+| **Installer** *(Recommended)* | [`Tethys_x64.msi`](https://github.com/QuangquyNguyenvo/Tethys/releases/latest) | Daily Driver | Standard Windows installer. Creates Start Menu shortcut, desktop icon, and system integration. |
+| **Portable** | [`Tethys_portable.zip`](https://github.com/QuangquyNguyenvo/Tethys/releases/latest) | Portable / USB | Zero installation. Extract anywhere and double-click `tethys.exe` without admin privileges. |
+
+> [!TIP]
+> **Requirements**: Windows 11 or Windows 10 (x64). Hardware-accelerated GPU rendering is enabled out of the box.
 
 ## Essential Shortcuts
 
@@ -125,8 +148,10 @@ npm run tauri build
 
 </details>
 
----
+<br />
 
 <div align="center">
+  <img src="assets/dividers/divider.svg" width="100%" />
+  <br /><br />
   MIT License · Created with passion by <a href="https://github.com/QuangquyNguyenvo">QuangquyNguyenvo</a>
 </div>

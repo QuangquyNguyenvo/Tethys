@@ -1,0 +1,104 @@
+<svg width="1000" height="110" viewBox="0 0 1000 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Ocean Sky & Deep Sea Gradients -->
+    <linearGradient id="ocean-sky-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85" />
+      <stop offset="40%" stop-color="#53d7d6" stop-opacity="0.65" />
+      <stop offset="80%" stop-color="#818cf8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#111a33" stop-opacity="0.95" />
+    </linearGradient>
+
+    <linearGradient id="wave-layer-1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#53d7d6" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0.6" />
+    </linearGradient>
+
+    <linearGradient id="wave-layer-2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.5" />
+      <stop offset="50%" stop-color="#c084fc" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.5" />
+    </linearGradient>
+
+    <linearGradient id="wave-layer-3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.4" />
+    </linearGradient>
+
+    <filter id="soft-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <style>
+      @keyframes wave-flow-1 {
+        0%, 100% { transform: translateY(0px) scaleY(1); }
+        50% { transform: translateY(-4px) scaleY(1.08); }
+      }
+      @keyframes wave-flow-2 {
+        0%, 100% { transform: translateY(0px) scaleY(1); }
+        50% { transform: translateY(5px) scaleY(0.92); }
+      }
+      @keyframes bubble-rise {
+        0%, 100% { transform: translateY(0px); opacity: 0.2; }
+        50% { transform: translateY(-8px); opacity: 0.6; }
+      }
+      @keyframes star-twinkle {
+        0%, 100% { opacity: 0.2; transform: scale(0.8); }
+        50% { opacity: 0.9; transform: scale(1.3); }
+      }
+      .anim-wave-1 {
+        transform-origin: 500px 50px;
+        animation: wave-flow-1 6s ease-in-out infinite;
+      }
+      .anim-wave-2 {
+        transform-origin: 500px 50px;
+        animation: wave-flow-2 5s ease-in-out infinite 1s;
+      }
+      .b1 { transform-origin: center; animation: bubble-rise 4s ease-in-out infinite; }
+      .b2 { transform-origin: center; animation: bubble-rise 4.5s ease-in-out infinite 1.5s; }
+      .b3 { transform-origin: center; animation: bubble-rise 3.8s ease-in-out infinite 0.8s; }
+      .b4 { transform-origin: center; animation: bubble-rise 5s ease-in-out infinite 2.2s; }
+      .s1 { transform-box: fill-box; transform-origin: center; animation: star-twinkle 3s ease-in-out infinite; }
+      .s2 { transform-box: fill-box; transform-origin: center; animation: star-twinkle 3s ease-in-out infinite 1.5s; }
+    </style>
+  </defs>
+
+  <!-- Top Base Sky/Ocean Container with rounded top corners -->
+  <rect x="0" y="0" width="1000" height="75" fill="url(#ocean-sky-grad)" rx="12" />
+
+  <!-- Background Wave Layer 3 (Deep Sea Base) -->
+  <path d="M 0 0 L 1000 0 L 1000 65 Q 850 80, 700 65 T 400 65 T 100 75 L 0 65 Z" fill="url(#wave-layer-3)" opacity="0.6" />
+
+  <!-- Animated Wave Layer 2 (Middle Surf) -->
+  <path class="anim-wave-2" d="M 0 0 L 1000 0 L 1000 50 Q 800 35, 600 55 T 200 45 L 0 55 Z" fill="url(#wave-layer-2)" opacity="0.75" />
+
+  <!-- Animated Wave Layer 1 (Crest Wave) -->
+  <path class="anim-wave-1" d="M 0 0 L 1000 0 L 1000 38 Q 750 60, 500 38 T 0 42 Z" fill="url(#wave-layer-1)" opacity="0.85" />
+
+  <!-- Floating Translucent Water Droplets / Bubbles -->
+  <circle class="b1" cx="120" cy="30" r="18" fill="#ffffff" opacity="0.12" />
+  <circle class="b1" cx="130" cy="25" r="5" fill="#ffffff" opacity="0.25" />
+
+  <circle class="b2" cx="320" cy="22" r="12" fill="#ffffff" opacity="0.1" />
+  <circle class="b3" cx="680" cy="35" r="22" fill="#ffffff" opacity="0.1" />
+  <circle class="b3" cx="692" cy="28" r="6" fill="#ffffff" opacity="0.2" />
+
+  <circle class="b4" cx="880" cy="25" r="14" fill="#ffffff" opacity="0.14" />
+  <circle class="b4" cx="888" cy="20" r="4" fill="#ffffff" opacity="0.28" />
+
+  <!-- Sparkles / Little Ocean Stars -->
+  <g class="s1">
+    <path d="M 220 18 Q 220 23, 225 23 Q 220 23, 220 28 Q 220 23, 215 23 Q 220 23, 220 18 Z" fill="#ffffff" opacity="0.8" />
+  </g>
+  <g class="s2">
+    <path d="M 780 20 Q 780 25, 785 25 Q 780 25, 780 30 Q 780 25, 775 25 Q 780 25, 780 20 Z" fill="#ffffff" opacity="0.85" />
+  </g>
+  <g class="s1">
+    <path d="M 490 15 Q 490 19, 494 19 Q 490 19, 490 23 Q 490 19, 486 19 Q 490 19, 490 15 Z" fill="#ffffff" opacity="0.75" />
+  </g>
+
+  <!-- Bottom Delicate Edge Highlight -->
+  <path class="anim-wave-1" d="M 0 42 Q 250 16, 500 38 T 1000 38" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.4" />
+</svg>
