@@ -24,7 +24,11 @@ Running `claude`, `codex`, `aider` (or any CLI agent) all day means it's constan
 Everything lives on one tiling canvas: split panels, drag them around, resize freely. The terminal is a tile in your workspace, not the whole app.
 
 <div align="center">
-  <img src="assets/screenshots/preview.png" alt="Tethys tiling terminal workspace showing multiple panels and Material You theme settings" width="100%" />
+  <a href="assets/demo/tethys-demo.mp4">
+    <img src="assets/demo/tethys-demo.webp" alt="Tethys demo showing tiling panels, embedded web and file explorer views, Material You themes, and multiple workspaces" width="100%" />
+  </a>
+  <br />
+  <sub>▶ Click the preview to watch the full 720p demo</sub>
 </div>
 
 ---
