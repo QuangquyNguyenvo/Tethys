@@ -2,7 +2,7 @@
 
 <div align="center">
   <br />
-  <img src="assets/logo.png" alt="Tethys logo" width="120" />
+  <img src="assets/tethys-animated-title.svg" alt="Tethys Title" width="680" />
 
   # 🪼 Tethys 🌊
 
@@ -12,20 +12,23 @@
   [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-38bdf8?style=for-the-badge&logo=windows11&logoColor=white&labelColor=0d1527)](https://github.com/QuangquyNguyenvo/Tethys)
   [![License](https://img.shields.io/badge/License-MIT-c084fc?style=for-the-badge&logo=opensourceinitiative&logoColor=white&labelColor=0d1527)](LICENSE)
 
-  <br /><br />
-
+  <br />
   <img src="assets/dividers/divider.svg" width="100%" />
 </div>
 
-## Why Tethys
+## 💡 Why Tethys
 
 **Coding with AI agents changes how we interact with our workspace.**
 
-When tools like `claude`, `codex`, or `aider` write code, modify specs, and run background jobs all at once, a standard terminal is no longer enough. On Windows, tracking these actions usually means endless Alt-Tabbing across editors, diff tools, and file explorers just to see what the agent changed.
+> When tools like `claude`, `codex`, or `aider` write code, modify specs, and run background jobs all at once, a standard terminal is no longer enough. On Windows, tracking these actions usually means endless Alt-Tabbing across editors, diff tools, and file explorers just to see what the agent changed.
+
+<div align="center">
+  <img src="assets/dividers/divider-mini.svg" width="340" />
+</div>
 
 **Tethys brings the power and fluid tiling of a Linux desktop directly to Windows.**
 
-Terminal sessions, live markdown previews, image inspectors, and git diffs live together on one responsive canvas. The instant an agent updates a file or drops a diff, it renders side by side in real time, keeping you completely in your flow without overlapping window clutter.
+> Terminal sessions, live markdown previews, image inspectors, and git diffs live together on one responsive canvas. The instant an agent updates a file or drops a diff, it renders side by side in real time, keeping you completely in your flow without overlapping window clutter.
 
 <div align="center">
   <a href="assets/demo/tethys-demo.mp4">
@@ -35,7 +38,7 @@ Terminal sessions, live markdown previews, image inspectors, and git diffs live 
 
 <img src="assets/dividers/divider.svg" width="100%" />
 
-## Highlights
+## ⚡ Highlights
 
 <table>
   <tr>
@@ -72,7 +75,7 @@ Terminal sessions, live markdown previews, image inspectors, and git diffs live 
 
 <img src="assets/dividers/divider.svg" width="100%" />
 
-## Interface
+## 🖥️ Interface & Workspaces
 
 <table>
   <tr>
@@ -99,7 +102,7 @@ Terminal sessions, live markdown previews, image inspectors, and git diffs live 
 
 <img src="assets/dividers/divider.svg" width="100%" />
 
-## Getting Started
+## 🚀 Getting Started
 
 Download the latest release from [GitHub Releases](https://github.com/QuangquyNguyenvo/Tethys/releases/latest). Choose the package that best fits your workflow:
 
@@ -111,7 +114,7 @@ Download the latest release from [GitHub Releases](https://github.com/QuangquyNg
 > [!TIP]
 > **Requirements**: Windows 11 or Windows 10 (x64). Hardware-accelerated GPU rendering is enabled out of the box.
 
-## Essential Shortcuts
+## ⌨️ Essential Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
@@ -127,7 +130,7 @@ Download the latest release from [GitHub Releases](https://github.com/QuangquyNg
 | <kbd>F11</kbd> | Toggle Fullscreen |
 
 <details>
-<summary><b>Build from Source</b></summary>
+<summary><b>🛠️ Build from Source</b></summary>
 
 <br />
 

@@ -42,5 +42,6 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Internal Plans & Baselines
-plans/terminal-workspace/
+# Internal Plans, Context & Local Documentation
+plans/
+PROJECT_CONTEXT.md
