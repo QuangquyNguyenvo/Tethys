@@ -3,7 +3,8 @@
 <div align="center">
   <br />
   <img src="assets/tethys-animated-title.svg" alt="Tethys Title" width="680" />
-
+  <img src="assets/dividers/divider-mini.svg" width="340" />
+  
   # 🪼 Tethys 🌊
 
   **A dedicated Linux-style tiling workspace on Windows, built for modern developers and AI agents.**
@@ -13,7 +14,7 @@
   [![License](https://img.shields.io/badge/License-MIT-c084fc?style=for-the-badge&logo=opensourceinitiative&logoColor=white&labelColor=0d1527)](LICENSE)
 
   <br />
-  <img src="assets/dividers/divider.svg" width="100%" />
+  
 </div>
 
 ## 💡 Why Tethys
