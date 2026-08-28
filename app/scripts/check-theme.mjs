@@ -21,6 +21,7 @@ await build({
   stdin: {
     contents: `
       export * from "./src/theme/palette.ts";
+      export * from "./src/theme/quantize.ts";
       export { Hct } from "@material/material-color-utilities";
     `,
     resolveDir: process.cwd(),
@@ -49,9 +50,42 @@ const chroma = (hex) => P.Hct.fromInt(0xff000000 | parseInt(hex.slice(1), 16)).c
 
 const SCHEMES = ["TonalSpot", "Vibrant", "Expressive", "Neutral", "Content", "Monochrome"];
 const SEEDS = [P.FALLBACK_SEED, 0xff2f6f4e, 0xffb03a2e, 0xff1c3f8f];
+const WALLPAPER_CLUSTERS = [0xff315f8f, 0xffaf5266, 0xff4d7651];
+
+// Cùng một bitmap phải luôn sinh cùng Celebi map và không được để lại Math.random đã vá.
+const SAMPLE_PIXELS = Array.from({ length: 4096 }, (_, i) =>
+  WALLPAPER_CLUSTERS[(i * 17 + Math.floor(i / 29)) % WALLPAPER_CLUSTERS.length]);
+const nativeRandom = Math.random;
+const firstQuantization = [...P.quantizeCelebiStable(SAMPLE_PIXELS, 16).entries()];
+const secondQuantization = [...P.quantizeCelebiStable(SAMPLE_PIXELS, 16).entries()];
+if (JSON.stringify(firstQuantization) !== JSON.stringify(secondQuantization) || Math.random !== nativeRandom) {
+  console.error("Celebi quantization is not deterministic or did not restore Math.random.");
+  process.exit(1);
+}
 
 let fail = 0;
 const rows = [];
+
+// Dock wallpaper mode phải giữ hue của các cụm Celebi nhưng sắp chúng thành một ramp liền.
+// Icon là hình đồ họa nên WCAG non-text yêu cầu tối thiểu 3:1 với nền ô màu.
+for (const dark of [true, false]) {
+  const opts = { ...P.DEFAULTS, dark };
+  const s = P.buildScheme(WALLPAPER_CLUSTERS[0], opts);
+  const dock = P.accentVars(s, opts, WALLPAPER_CLUSTERS);
+  const tileHues = [];
+  for (let i = 0; i < 7; i++) {
+    const tileHue = P.Hct.fromInt(0xff000000 | parseInt(dock[`--ui-accent-${i + 1}`].slice(1), 16)).hue;
+    tileHues.push(tileHue);
+    const iconContrast = contrast(dock[`--ui-accent-${i + 1}`], dock[`--ui-on-accent-${i + 1}`]);
+    if (iconContrast < 3) fail++;
+  }
+  for (let i = 1; i < 5; i++) {
+    const hueGap = Math.abs(((tileHues[i] - tileHues[i - 1] + 540) % 360) - 180);
+    if (hueGap > 65) fail++;
+  }
+  const firstPairGap = Math.abs(((tileHues[1] - tileHues[0] + 540) % 360) - 180);
+  if (firstPairGap < 12) fail++;
+}
 
 for (const scheme of SCHEMES) {
   for (const dark of [true, false]) {
@@ -189,4 +223,4 @@ if (fail) {
   console.error(`\n${fail} tổ hợp KHÔNG đạt.`);
   process.exit(1);
 }
-console.log("\nC4 + C5 PASS trên 6 scheme × dark/light × 4 màu gốc.");
+console.log("\nC4 + C5 và màu dock theo cụm wallpaper đều PASS.");

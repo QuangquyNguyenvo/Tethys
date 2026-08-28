@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export type DockItem = {
   id: string;
   label: string;
-  /** Chỉ số ô màu 1..7 trong `--ui-accent-*`. Màu vẫn sinh từ ảnh nền, không chôn hex. */
+  /** Chỉ số ô màu 1..7 trong `--ui-accent-*`; wallpaper mode lấy trực tiếp từ cụm Celebi. */
   accent: number;
   /** Icon `lucide-react` dựng sẵn. */
   icon: ReactNode;

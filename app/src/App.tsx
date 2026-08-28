@@ -19,6 +19,7 @@ import "./App.css";
 
 const WINDOWS_NATIVE_FKEYS =
   "__TAURI_INTERNALS__" in window && navigator.userAgent.includes("Windows");
+const WORKSPACE_NAV_REVEAL_MS = 1100;
 
 export default function App() {
   const { xterm, source, wallpaper, opts, setOpts, refresh } = useTheme();
@@ -44,8 +45,46 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [navKeyboardReveal, setNavKeyboardReveal] = useState(false);
   const fullscreenState = useRef(false);
   const fullscreenTogglePending = useRef(false);
+  const workspaceNavTimerRef = useRef<number | null>(null);
+  const panelFocusFrameRef = useRef<number | null>(null);
+
+  const revealWorkspaceNav = useCallback(() => {
+    setNavKeyboardReveal(true);
+    if (workspaceNavTimerRef.current !== null) {
+      window.clearTimeout(workspaceNavTimerRef.current);
+    }
+    workspaceNavTimerRef.current = window.setTimeout(() => {
+      workspaceNavTimerRef.current = null;
+      setNavKeyboardReveal(false);
+    }, WORKSPACE_NAV_REVEAL_MS);
+  }, []);
+
+  const focusSelectedPanelInput = useCallback(() => {
+    if (panelFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(panelFocusFrameRef.current);
+    }
+    panelFocusFrameRef.current = window.requestAnimationFrame(() => {
+      panelFocusFrameRef.current = null;
+      const key = useSessions.getState().focused;
+      if (!key) return;
+      const panel = document.querySelector<HTMLElement>(`[data-panel-key="${key}"]`);
+      if (!panel || panel.classList.contains("hidden")) return;
+      const terminalInput = panel.querySelector<HTMLElement>(".xterm-helper-textarea");
+      (terminalInput ?? panel).focus({ preventScroll: true });
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (workspaceNavTimerRef.current !== null) {
+      window.clearTimeout(workspaceNavTimerRef.current);
+    }
+    if (panelFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(panelFocusFrameRef.current);
+    }
+  }, []);
 
   const setFullscreen = useCallback((fullscreen: boolean) => {
     // WebView2 có thể phát cả accelerator native lẫn DOM keydown cho cùng một lần bấm.
@@ -349,11 +388,12 @@ export default function App() {
           e.preventDefault();
           e.stopPropagation();
           move(1);
+          focusSelectedPanelInput();
           return;
         }
       }
 
-      // Alt+1…9 — nhảy thẳng tới workspace thứ n.
+      // Alt+1…9 nhảy thẳng tới workspace; Alt+T/W tạo và đóng workspace.
       //
       // So bằng `e.code` chứ không `e.key`: trên Windows, Alt+<số> đi qua bảng layout nên
       // `e.key` có thể ra ký tự khác hẳn (và Alt+<số> ở numpad chính là lối gõ Alt-code).
@@ -366,13 +406,32 @@ export default function App() {
         !e.metaKey &&
         useThemeStore.getState().opts.workspaceAltKeys !== false
       ) {
+        if (e.code === "KeyT" || e.code === "KeyW") {
+          e.preventDefault();
+          e.stopPropagation();
+          const s = useSessions.getState();
+          if (e.code === "KeyT") {
+            addWorkspace(
+              undefined,
+              "__TAURI_INTERNALS__" in window ? undefined : { type: "explorer" },
+            );
+          } else {
+            s.removeWorkspace(s.activeWorkspaceId);
+          }
+          revealWorkspaceNav();
+          return;
+        }
+
         const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
         if (m) {
           e.preventDefault();
           e.stopPropagation();
           const s = useSessions.getState();
           const target = s.workspaces[Number(m[1]) - 1];
-          if (target) s.switchWorkspace(target.id);
+          if (target) {
+            s.switchWorkspace(target.id);
+            revealWorkspaceNav();
+          }
           return;
         }
       }
@@ -466,7 +525,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [remove, move, snapPanel, stepTermOpacity, duplicate, openSettings, createPanel, cycleWorkspace, toggleFullscreen]);
+  }, [remove, move, snapPanel, stepTermOpacity, duplicate, openSettings, createPanel, cycleWorkspace, addWorkspace, toggleFullscreen, focusSelectedPanelInput, revealWorkspaceNav]);
 
   const commands: CommandItem[] = useMemo(
     () => [
@@ -591,7 +650,7 @@ export default function App() {
       },
       {
         id: "toggle_wskeys",
-        title: "Toggle whether Alt+1…9 switches workspaces or is handled by the shell",
+        title: "Toggle whether Alt workspace shortcuts are handled by the app or shell",
         category: "Settings",
         action: () => {
           setOpts({ workspaceAltKeys: !useThemeStore.getState().opts.workspaceAltKeys });
@@ -717,28 +776,28 @@ export default function App() {
       {
         id: "files",
         label: "Files",
-        accent: 3,
+        accent: 2,
         onClick: () => createPanel({ type: "explorer" }),
         icon: <Folder size={19} />,
       },
       {
         id: "web",
         label: "Web",
-        accent: 4,
+        accent: 3,
         onClick: () => createPanel({ type: "web" }),
         icon: <Globe size={19} />,
       },
       {
         id: "settings",
         label: "Settings (Ctrl+,)",
-        accent: 6,
+        accent: 4,
         onClick: openSettings,
         icon: <Settings size={19} />,
       },
       {
         id: "system",
         label: "System",
-        accent: 2,
+        accent: 5,
         onClick: openSystem,
         icon: <MonitorCog size={19} />,
       },
@@ -778,8 +837,9 @@ export default function App() {
         // Fullscreen thật (Alt+Enter/F11) không còn viền cửa sổ để bám vào — ép luôn kiểu
         // tự-ẩn-rê-chuột-hiện-lại cho titlebar/dock bất kể cài đặt thường, chứ không
         // `display: none` khiến chúng biến mất hẳn không cách nào gọi lại.
-        ((opts.dockAutoHide || isFullscreen) ? " dock-auto" : "") +
-        ((opts.navAutoHide || isFullscreen) ? " nav-auto" : "") +
+        ((opts.dockAutoHide || isFullscreen) && tree ? " dock-auto" : "") +
+        ((opts.navAutoHide || isFullscreen) && tree ? " nav-auto" : "") +
+        (navKeyboardReveal ? " nav-keyboard-reveal" : "") +
         (opts.blurEffects === false ? " effects-off" : "") +
         // Bề mặt phẳng là một lớp override cuối `App.css`, không phải một bộ CSS thứ hai:
         // nó chỉ tắt blur, bóng và độ trong, còn hình khối vẫn của bản gốc.
@@ -815,7 +875,7 @@ export default function App() {
         <Tiles theme={xterm} />
       </main>
 
-      <Dock items={dockItems} autoHide={opts.dockAutoHide || isFullscreen} />
+      <Dock items={dockItems} autoHide={!!tree && (opts.dockAutoHide || isFullscreen)} />
 
       <CommandPalette
         isOpen={paletteOpen}

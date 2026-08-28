@@ -352,6 +352,7 @@ function PanelHost({
       style={place(rect)}
       data-panel-key={panel.key}
       data-panel-type={panel.type ?? "terminal"}
+      tabIndex={-1}
       onPointerDownCapture={() => focus(panel.key)}
       onFocusCapture={() => focus(panel.key)}
     >
@@ -551,32 +552,16 @@ function EmptyState({ onTerminal, onFiles }: { onTerminal: () => void; onFiles: 
   return (
     <div className="empty-workspace">
       <div className="empty-card">
-        <Icon name="terminal" size={44} className="empty-icon" />
-        <div className="empty-text">
-          <h3>Workspace is empty</h3>
-          <p>Open a terminal or preview a document to get started</p>
-        </div>
+        <h3>Start a workspace</h3>
         <div className="empty-actions">
           <button className="empty-btn primary" onClick={onTerminal}>
-            <Icon name="add" size={18} />
-            <span>New terminal</span>
+            <Icon name="terminal" size={18} />
+            <span>Terminal</span>
           </button>
           <button className="empty-btn secondary" onClick={onFiles}>
             <Icon name="folder" size={18} />
-            <span>Browse files</span>
+            <span>Files</span>
           </button>
-        </div>
-        <div className="empty-hints">
-          <span>
-            <kbd>Ctrl</kbd>
-            <kbd>K</kbd>
-            Command palette
-          </span>
-          <span>
-            <kbd>Win</kbd>
-            <kbd>← ↑ ↓ →</kbd>
-            Snap panel
-          </span>
         </div>
       </div>
     </div>

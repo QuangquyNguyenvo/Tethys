@@ -8,7 +8,8 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { QuantizerCelebi, Score } from "@material/material-color-utilities";
+import { Score } from "@material/material-color-utilities";
+import { quantizeCelebiStable } from "./quantize";
 import {
   BRAND_TEAL,
   DEFAULTS,
@@ -37,6 +38,8 @@ const BLUR_EDGE = 320;
 type ThemeStore = {
   opts: ThemeOptions;
   seed: number;
+  /** Các màu Celebi đã xếp hạng; dock dùng cả dãy thay vì tự bịa hue quanh một seed. */
+  wallpaperColors: number[];
   /**
    * Màu gốc đang lấy từ đâu — để UI settings nói rõ thay vì im lặng.
    * `brand` nghĩa là không đọc ảnh nền chút nào, màu lấy thẳng từ logo.
@@ -54,19 +57,21 @@ type ThemeStore = {
     wallpaper: string,
     error?: string,
     wallBlur?: string,
+    wallpaperColors?: number[],
   ) => void;
 };
 
 export const useThemeStore = create<ThemeStore>((set) => ({
   opts: DEFAULTS,
   seed: FALLBACK_SEED,
+  wallpaperColors: [],
   source: "loading",
   wallpaper: "",
   wallBlur: "",
   error: "",
   setOpts: (patch) => set((s) => ({ opts: { ...s.opts, ...patch } })),
-  setSeed: (seed, source, wallpaper, error = "", wallBlur = "") =>
-    set({ seed, source, wallpaper, error, wallBlur }),
+  setSeed: (seed, source, wallpaper, error = "", wallBlur = "", wallpaperColors = []) =>
+    set({ seed, source, wallpaper, error, wallBlur, wallpaperColors }),
 }));
 
 /**
@@ -96,7 +101,12 @@ function blurredWallpaper(img: HTMLImageElement): string {
   return canvas.toDataURL("image/webp", 0.72);
 }
 
-async function seedFromWallpaper(customPath?: string): Promise<{ seed: number; path: string; blur: string }> {
+async function seedFromWallpaper(customPath?: string): Promise<{
+  seed: number;
+  colors: number[];
+  path: string;
+  blur: string;
+}> {
   const path = customPath || await invoke<string>("wallpaper_path");
   const img = new Image();
   // asset: protocol phục vụ từ origin khác nên canvas bị taint và `getImageData` ném lỗi.
@@ -121,9 +131,26 @@ async function seedFromWallpaper(customPath?: string): Promise<{ seed: number; p
     if (data[i + 3] < 255) continue; // bỏ pixel trong suốt, chúng kéo màu về xám
     pixels.push((255 << 24) | (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
   }
-  const ranked = Score.score(QuantizerCelebi.quantize(pixels, 128));
+  const quantized = quantizeCelebiStable(pixels, 128);
+  const ranked = Score.score(quantized, {
+    desired: 7,
+    fallbackColorARGB: FALLBACK_SEED,
+  });
+  // Seed cần một màu đủ tốt để dựng Material scheme, nên giữ bộ lọc mặc định. Dock thì
+  // phải phản ánh cả wallpaper ít bão hoà; `filter: false` tránh biến ảnh xám thành teal
+  // fallback chỉ vì Score coi màu xám không phù hợp làm seed chủ đạo.
+  const dockColors = Score.score(quantized, {
+    desired: 7,
+    fallbackColorARGB: FALLBACK_SEED,
+    filter: false,
+  });
   // Cùng một `img` đã giải mã, không đọc lại tệp.
-  return { seed: ranked[0] ?? FALLBACK_SEED, path, blur: blurredWallpaper(img) };
+  return {
+    seed: ranked[0] ?? FALLBACK_SEED,
+    colors: dockColors,
+    path,
+    blur: blurredWallpaper(img),
+  };
 }
 
 /**
@@ -136,7 +163,7 @@ async function seedFromWallpaper(customPath?: string): Promise<{ seed: number; p
 export function refreshSeed() {
   const { setSeed, opts } = useThemeStore.getState();
   return seedFromWallpaper(opts.wallpaperPath || undefined)
-    .then(({ seed, path, blur }) => setSeed(seed, "wallpaper", path, "", blur))
+    .then(({ seed, colors, path, blur }) => setSeed(seed, "wallpaper", path, "", blur, colors))
     .catch((e) => setSeed(FALLBACK_SEED, "fallback", "", String(e?.message ?? e)));
 }
 
@@ -145,7 +172,8 @@ export function setCustomWallpaper(path: string) {
   const { setSeed, setOpts } = useThemeStore.getState();
   setOpts({ wallpaperPath: path });
   return seedFromWallpaper(path)
-    .then(({ seed, path: resolved, blur }) => setSeed(seed, "wallpaper", resolved, "", blur))
+    .then(({ seed, colors, path: resolved, blur }) =>
+      setSeed(seed, "wallpaper", resolved, "", blur, colors))
     .catch((e) => setSeed(FALLBACK_SEED, "fallback", "", String(e?.message ?? e)));
 }
 
@@ -153,13 +181,13 @@ export function useDesktopWallpaper() {
   const { setSeed, setOpts } = useThemeStore.getState();
   setOpts({ wallpaperPath: "" });
   return seedFromWallpaper()
-    .then(({ seed, path, blur }) => setSeed(seed, "wallpaper", path, "", blur))
+    .then(({ seed, colors, path, blur }) => setSeed(seed, "wallpaper", path, "", blur, colors))
     .catch((e) => setSeed(FALLBACK_SEED, "fallback", "", String(e?.message ?? e)));
 }
 
 /** Gọi một lần ở gốc cây React. Trả về scheme để nơi khác (xterm) dùng lại. */
 export function useTheme() {
-  const { opts, seed, source, wallpaper, wallBlur, error, setSeed, setOpts } = useThemeStore();
+  const { opts, seed, wallpaperColors, source, wallpaper, wallBlur, error, setSeed, setOpts } = useThemeStore();
 
   // Bảng màu brand trên bề mặt phẳng thì ảnh nền không được dùng vào việc gì — không sinh
   // màu, cũng không hiện ra sau panel. Quét nó vẫn là decode một tấm ảnh 4K rồi lượng tử
@@ -175,8 +203,8 @@ export function useTheme() {
     }
     let cancelled = false;
     seedFromWallpaper(opts.wallpaperPath || undefined)
-      .then(({ seed, path, blur }) => {
-        if (!cancelled) setSeed(seed, "wallpaper", path, "", blur);
+      .then(({ seed, colors, path, blur }) => {
+        if (!cancelled) setSeed(seed, "wallpaper", path, "", blur, colors);
       })
       .catch((e) => {
         // Thà xấu còn hơn trắng bệch: vẫn có màu, và `source` nói rõ là đang chạy fallback.
@@ -193,7 +221,7 @@ export function useTheme() {
   useEffect(() => {
     const vars = {
       ...chromeVars(scheme),
-      ...accentVars(scheme, opts),
+      ...accentVars(scheme, opts, source === "wallpaper" ? wallpaperColors : []),
       ...terminalVars(scheme, opts),
     };
     applyVars(vars);
@@ -222,6 +250,7 @@ export function useTheme() {
     }).catch(() => {});
   }, [
     seed,
+    wallpaperColors,
     source,
     error,
     wallBlur,

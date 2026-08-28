@@ -12,12 +12,19 @@ const tiles = read("src/layout/Tiles.tsx");
 const panelDrag = read("src/layout/usePanelDrag.ts");
 const settings = read("src/settings/SettingsModal.tsx");
 const palette = read("src/palette/CommandPalette.tsx");
+const theme = read("src/theme/useTheme.ts");
 
 assert.match(app, /e\.key === "F5"/, "F5 must never fall through to a full app reload");
 assert.match(
   app,
   /if \(!WINDOWS_NATIVE_FKEYS\) toggleFullscreen\(\)/,
   "Windows F11 must not toggle from both native and DOM handlers",
+);
+assert.match(theme, /desired:\s*7/, "Celebi scoring must retain enough wallpaper colors for the dock");
+assert.match(
+  theme,
+  /accentVars\(scheme, opts, source === "wallpaper" \? wallpaperColors : \[\]\)/,
+  "Wallpaper-ranked Celebi colors must feed the dock accents directly",
 );
 assert.match(
   app,
@@ -42,6 +49,16 @@ assert.doesNotMatch(
 const autoHideTitlebar = css.match(/\.app\.nav-auto \.titlebar\s*\{([^}]*)\}/)?.[1] ?? "";
 assert.match(autoHideTitlebar, /transform:\s*translate3d\(/, "Auto-hide titlebar must use compositor transform");
 assert.doesNotMatch(autoHideTitlebar, /margin-top/, "Auto-hide titlebar must not resize the terminal canvas");
+assert.match(app, /navKeyboardReveal/, "Workspace shortcuts must temporarily reveal the auto-hidden titlebar");
+assert.match(css, /\.app\.nav-auto\.nav-keyboard-reveal \.titlebar/, "Keyboard workspace reveal must use the existing titlebar surface");
+assert.match(app, /focusSelectedPanelInput\(\)/, "Ctrl+Tab must move DOM input focus with the selected panel");
+assert.match(tiles, /tabIndex=\{-1\}/, "Non-terminal panels must accept programmatic focus after Ctrl+Tab");
+assert.match(app, /e\.code === "KeyT" \|\| e\.code === "KeyW"/, "Alt+T/W workspace shortcuts must stay guarded together");
+assert.match(
+  app,
+  /<Dock items=\{dockItems\} autoHide=\{!!tree && \(opts\.dockAutoHide \|\| isFullscreen\)\} \/>/,
+  "The empty workspace must keep the dock visible and disable auto-hide",
+);
 
 const terminalMotionStart = css.indexOf("@keyframes terminal-workspace-enter-right");
 const terminalMotionEnd = css.indexOf('.panel-host[data-panel-type="terminal"]', terminalMotionStart);

@@ -107,7 +107,7 @@ export type ThemeOptions = {
    */
   tabShortcuts: boolean;
   /**
-   * `Alt+1…9` nhảy thẳng tới workspace thứ n.
+   * `Alt+1…9` nhảy thẳng tới workspace; `Alt+T/W` tạo và đóng workspace.
    *
    * Cũng là công tắc vì lý do y hệt `tabShortcuts`: `Alt+<số>` là meta-số của readline, và
    * vài TUI dùng nó làm đối số lặp. App giành trước thì shell không thấy nữa.
@@ -416,25 +416,114 @@ export function applyVars(vars: Record<string, string>) {
 /**
  * Bảng màu cho các ô icon ở dock.
  *
- * Ảnh tham chiếu user gửi có một dãy icon nhiều màu trên nền tối — đó là thứ làm dock
- * "vui" thay vì thành một hàng nút xám. Nhưng vẫn không được chôn hex: bảy hue này lấy
- * chroma và tone từ chính tonal palette của ảnh nền, rồi kéo một phần về seed như ANSI,
- * nên đổi ảnh nền là cả dãy đổi theo.
+ * Khi đọc được wallpaper, `sourceColors` là tối đa bảy cụm màu do Celebi lượng tử hoá và
+ * Score xếp hạng. Dock giữ hue/chroma của các cụm đó rồi chỉ chuẩn hoá tone để icon luôn
+ * rõ. Nếu ảnh chỉ có một vài màu phù hợp, các ô lặp lại chính bảng màu ấy với một dịch hue
+ * rất nhỏ; như vậy dock hoà vào ảnh thay vì dựng một cầu vồng không tồn tại trong ảnh.
+ * Nhánh brand/fallback vẫn sinh màu từ scheme vì lúc đó không có pixel wallpaper.
  */
-export function accentVars(s: DynamicScheme, o: ThemeOptions): Record<string, string> {
+type DockRampColor = { hue: number; chroma: number; tone: number };
+
+/** Cắt vòng hue tại khoảng trống lớn nhất rồi nội suy thành số bước được yêu cầu. */
+function dockColorRamp(colors: Hct[], seedHue: number, steps: number): DockRampColor[] {
+  if (!colors.length) return [];
+  const denominator = Math.max(1, steps - 1);
+
+  if (colors.every((color) => color.chroma < 12)) {
+    const muted = [...colors].sort((a, b) => a.tone - b.tone);
+    return Array.from({ length: steps }, (_, i) => {
+      const position = i * (muted.length - 1) / denominator;
+      const left = muted[Math.floor(position)];
+      const right = muted[Math.ceil(position)];
+      const mix = position - Math.floor(position);
+      return {
+        hue: seedHue,
+        chroma: left.chroma + (right.chroma - left.chroma) * mix,
+        tone: left.tone + (right.tone - left.tone) * mix,
+      };
+    });
+  }
+
+  if (colors.length === 1) {
+    const only = colors[0];
+    const middle = denominator / 2;
+    return Array.from({ length: steps }, (_, i) => ({
+      hue: only.hue + (i - middle) * 5,
+      chroma: only.chroma,
+      tone: only.tone + (i - middle) * 1.5,
+    }));
+  }
+
+  const sorted = [...colors].sort((a, b) => a.hue - b.hue);
+  let largestGapAfter = 0;
+  let largestGap = -1;
+  for (let i = 0; i < sorted.length; i++) {
+    const nextHue = i === sorted.length - 1 ? sorted[0].hue + 360 : sorted[i + 1].hue;
+    const gap = nextHue - sorted[i].hue;
+    if (gap > largestGap) {
+      largestGap = gap;
+      largestGapAfter = i;
+    }
+  }
+
+  const ordered = Array.from({ length: sorted.length }, (_, i) => {
+    const index = (largestGapAfter + 1 + i) % sorted.length;
+    const color = sorted[index];
+    return {
+      hue: color.hue + (index <= largestGapAfter ? 360 : 0),
+      chroma: color.chroma,
+      tone: color.tone,
+    };
+  });
+
+  return Array.from({ length: steps }, (_, i) => {
+    const position = i * (ordered.length - 1) / denominator;
+    const left = ordered[Math.floor(position)];
+    const right = ordered[Math.ceil(position)];
+    const mix = position - Math.floor(position);
+    return {
+      hue: left.hue + (right.hue - left.hue) * mix,
+      chroma: left.chroma + (right.chroma - left.chroma) * mix,
+      tone: left.tone + (right.tone - left.tone) * mix,
+    };
+  });
+}
+
+export function accentVars(
+  s: DynamicScheme,
+  o: ThemeOptions,
+  sourceColors: number[] = [],
+): Record<string, string> {
   const seedHue = Hct.fromInt(s.sourceColorArgb).hue;
-  const chroma = Math.max(
-    46,
-    Hct.fromInt(s.primaryPalette.tone(o.dark ? 80 : 40)).chroma * 1.35,
-  );
-  const tone = o.dark ? 66 : 52;
-  const onTone = o.dark ? 14 : 100;
+  const celebiColors = sourceColors.map((color) => Hct.fromInt(color));
+  // Năm màu đầu phủ toàn bộ cung màu vì dock hiện có đúng năm hành động. Hai màu sau là
+  // điểm phụ cho panel dots; nếu nội suy thẳng bảy bước rồi chỉ dùng năm bước đầu, dock sẽ
+  // bỏ mất một đầu bảng màu và hai nút đầu gần như cùng màu.
+  const mainRamp = dockColorRamp(celebiColors, seedHue, 5);
+  const detailRamp = dockColorRamp(celebiColors, seedHue, 7);
+  const ramp = [...mainRamp, detailRamp[1], detailRamp[4]].filter(Boolean);
+  const fallbackHues = [0, 38, 88, 148, 202, 272, 322];
+  const surfaceTone = Hct.fromInt(MaterialDynamicColors.surfaceContainerHigh.getArgb(s)).tone;
+  const vividTone = o.dark ? 54 : 46;
+  // Kéo màu chính 24% về surface của dock sau khi đã chọn hue. Đây là bước làm dịu cuối,
+  // không làm các màu chính nhập lại với nhau như giảm chroma ngay từ lúc chọn màu.
+  const targetTone = surfaceTone + (vividTone - surfaceTone) * 0.76;
 
   const out: Record<string, string> = {};
-  [0, 38, 88, 148, 202, 272, 322].forEach((h, i) => {
-    const hue = harmonizeHue(h, seedHue, o.harmonize * 0.5);
+  for (let i = 0; i < 7; i++) {
+    const source = ramp[i];
+    const hue = source
+      ? source.hue % 360
+      : harmonizeHue(fallbackHues[i], seedHue, o.harmonize * 0.5);
+    const chroma = source
+      ? Math.min(58, Math.max(8, source.chroma * 0.82))
+      : Math.max(36, Hct.fromInt(s.primaryPalette.tone(o.dark ? 80 : 40)).chroma * 1.05);
+    const normalizedTone = source ? source.tone * 0.12 + targetTone * 0.88 : targetTone;
+    const tone = Math.min(targetTone + 4, Math.max(targetTone - 4, normalizedTone));
+    const onTone = tone >= 55 ? 8 : 98;
+
     out[`--ui-accent-${i + 1}`] = hexFromArgb(Hct.from(hue, chroma, tone).toInt());
-    out[`--ui-on-accent-${i + 1}`] = hexFromArgb(Hct.from(hue, chroma * 0.35, onTone).toInt());
-  });
+    out[`--ui-on-accent-${i + 1}`] = hexFromArgb(Hct.from(hue, chroma * 0.12, onTone).toInt());
+  }
   return out;
 }

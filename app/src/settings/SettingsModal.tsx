@@ -37,6 +37,7 @@ const KEYS: { keys: string[]; what: string }[] = [
   { keys: ["Ctrl", "W"], what: "Close panel" },
   { keys: ["Ctrl", "1 / 3"], what: "Prev / next workspace" },
   { keys: ["Alt", "1…9"], what: "Switch workspace" },
+  { keys: ["Alt", "T / W"], what: "New / close workspace" },
   { keys: ["Win", "← ↑ ↓ →"], what: "Snap selected panel" },
   { keys: ["Ctrl", "Alt", "← ↑ ↓ →"], what: "Snap panel (no Win key)" },
   { keys: ["Ctrl", "Shift", "E / O"], what: "Place right / below" },
@@ -426,7 +427,7 @@ export function SettingsModal({ onClose }: Props) {
                 <Group label="Key priority">
                   <div className="set-grid cols-2">
                     <OptionCard icon="tab" label="Tab-style panels" hint="Ctrl+T and Ctrl+W open and close panels like browser tabs." active={opts.tabShortcuts} onClick={() => setOpts({ tabShortcuts: !opts.tabShortcuts })} />
-                    <OptionCard icon="tag" label="Workspace numbers" hint="Alt+1…9 jumps straight to a workspace." active={opts.workspaceAltKeys} onClick={() => setOpts({ workspaceAltKeys: !opts.workspaceAltKeys })} />
+                    <OptionCard icon="tag" label="Workspace shortcuts" hint="Alt+1…9 switches; Alt+T/W creates or closes." active={opts.workspaceAltKeys} onClick={() => setOpts({ workspaceAltKeys: !opts.workspaceAltKeys })} />
                   </div>
                 </Group>
                 <Group label="Shortcut list">
