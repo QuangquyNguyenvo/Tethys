@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "check": "node scripts/check-tree.mjs && node scripts/check-theme.mjs && node scripts/check-links.mjs && node scripts/check-osc133.mjs && node scripts/check-memory.mjs && node scripts/check-ux.mjs && node scripts/check-release.mjs",
+    "check": "node scripts/check-tree.mjs && node scripts/check-theme.mjs && node scripts/check-links.mjs && node scripts/check-web.mjs && node scripts/check-osc133.mjs && node scripts/check-memory.mjs && node scripts/check-ux.mjs && node scripts/check-release.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

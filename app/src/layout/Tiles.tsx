@@ -309,7 +309,28 @@ function PanelHost({
   useLayoutEffect(() => {
     const previous = previousRect.current;
     previousRect.current = rect;
-    if (workspaceMotion || !previous || !visible || (previous.x === rect.x && previous.y === rect.y)) return;
+
+    const flipping =
+      !workspaceMotion &&
+      !!previous &&
+      visible &&
+      (previous.x !== rect.x || previous.y !== rect.y);
+
+    // Lần chạy này không FLIP thì phải **gỡ** offset đang treo, không được chỉ bỏ qua.
+    //
+    // Offset được đặt ngay lúc render và chỉ được gỡ trong callback của `requestAnimationFrame`.
+    // Nếu effect chạy lại trước khi frame đó kịp tới — đúng chuyện xảy ra khi đổi workspace,
+    // vì `Tiles` bật `workspaceMotion` trong cùng một nhịp — thì cleanup huỷ frame, nhánh này
+    // return sớm, và không còn ai gỡ offset nữa. Panel đứng lệch vĩnh viễn, trông như tile bị
+    // hở một khoảng vô cớ.
+    if (!flipping) {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      setMotionOffset(null);
+      return;
+    }
 
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     if (motionTimerRef.current !== null) window.clearTimeout(motionTimerRef.current);
@@ -371,7 +392,11 @@ function PanelHost({
           ) : panel.type === "explorer" ? (
             <ExplorerPanel panelKey={panel.key} path={panel.path} />
           ) : panel.type === "web" ? (
-            <WebPanel panelKey={panel.key} url={panel.url} />
+            <WebPanel
+              panelKey={panel.key}
+              url={panel.url}
+              suppressed={!visible || !!workspaceMotion}
+            />
           ) : panel.type === "settings" ? (
             // Settings là popup từ giờ, không còn dựng trong tile — state cũ lưu từ trước
             // được dọn lúc hydrate (`App.tsx`); nhánh này chỉ là lưới an toàn, không nên

@@ -12,6 +12,7 @@ import type { CommandItem } from "./palette/commands";
 import { Titlebar } from "./titlebar/Titlebar";
 import { Dock, type DockItem } from "./dock/Dock";
 import { Folder, Globe, MonitorCog, Settings, Terminal } from "lucide-react";
+import { setSurfaceBlocker } from "./web/surfaceVisibility";
 
 // Popup phụ trợ, không phải màn hình mặc định — nạp khi cần giống mọi panel khác trong Tiles.
 const SettingsModal = lazy(() => import("./settings/SettingsModal").then(({ SettingsModal }) => ({ default: SettingsModal })));
@@ -131,6 +132,53 @@ export default function App() {
       unlisten?.();
     };
   }, [toggleFullscreen]);
+  // Native browser overlay là cửa sổ riêng do main window sở hữu, nên Windows luôn vẽ nó
+  // trên shell. Palette và Settings phải nói ra là mình đang mở để overlay tự ẩn đi;
+  // không có bước này thì modal nằm *dưới* trang web và bấm không trúng.
+  useEffect(() => {
+    setSurfaceBlocker("palette", paletteOpen);
+  }, [paletteOpen]);
+
+  useEffect(() => {
+    setSurfaceBlocker("settings", settingsOpen);
+  }, [settingsOpen]);
+
+  // Phím tắt bấm khi con trỏ đang ở trong trang web đi tới WebView2 của overlay, không tới
+  // đây. Backend chỉ giữ đúng những tổ hợp Tethys gán rồi kể lại; dựng lại `KeyboardEvent`
+  // để bảng phím tắt bên dưới vẫn là nguồn sự thật duy nhất.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let disposed = false;
+
+    listen<{ key: string; code: string; ctrl: boolean; alt: boolean; shift: boolean }>(
+      "browser-key",
+      (event) => {
+        const { key, code, ctrl, alt, shift } = event.payload;
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key,
+            code,
+            ctrlKey: ctrl,
+            altKey: alt,
+            shiftKey: shift,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      },
+    )
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   // CSS controls the webview only; the actual Acrylic/Mica surface belongs to Windows.
   useEffect(() => {
     invoke("app_window_set_vibrancy", { enabled: opts.windowVibrancy !== false }).catch(() => {});

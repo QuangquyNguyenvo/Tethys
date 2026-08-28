@@ -38,4 +38,37 @@ assert.match(
   "The native WebView2 memory target must be applied",
 );
 
-console.log("PASS: hidden-panel lifecycle, scrollback bounds, and WebView2 memory targeting are guarded.");
+// Native browser overlay: trần số renderer và mục tiêu bộ nhớ theo trạng thái hiển thị.
+const pool = read("src/web/surfacePool.ts");
+const webPanel = read("src/web/WebPanel.tsx");
+const browserBackend = read("src-tauri/src/browser.rs");
+
+assert.match(pool, /export const MAX_NATIVE_SURFACES = \d+;/, "The native browser pool must have a stated cap");
+assert.match(pool, /entries\.size > MAX_NATIVE_SURFACES/, "Exceeding the cap must park a surface");
+assert.match(pool, /if \(key === panelKey\) continue;/, "A panel must never evict itself");
+assert.match(webPanel, /claimSurfaceSlot\(panelKey/, "Every native surface must take a pool slot");
+assert.match(webPanel, /releaseSurfaceSlot\(panelKey\)/, "Closing a panel must give the slot back");
+assert.match(
+  webPanel,
+  /setNativeMemoryTarget\(nativeLabel, hideSurface\)/,
+  "A hidden browser panel must drop to the low memory target",
+);
+assert.match(
+  browserBackend,
+  /COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW/,
+  "The overlay must support the low memory target",
+);
+assert.doesNotMatch(
+  browserBackend,
+  /\.TrySuspend\(/,
+  "TrySuspend must not be mixed with memory targeting on the same webview",
+);
+assert.match(
+  browserBackend,
+  /TETHYS_BROWSER_STATS/,
+  "Lifecycle counters must stay behind an environment flag",
+);
+
+console.log(
+  "PASS: hidden-panel lifecycle, scrollback bounds, WebView2 memory targeting, and the native browser pool are guarded.",
+);

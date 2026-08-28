@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon, type IconName } from "../ui/Icon";
+import { shellFloatRef } from "../web/surfaceVisibility";
 
 export type WorkspaceTab = {
   id: string;
@@ -166,6 +167,10 @@ export function Titlebar({
   return (
     <header
       className="titlebar"
+      // Khi thanh trên tự ẩn, nó nổi *trên* canvas — cùng bài toán với dock, nên overlay
+      // native cũng phải khoét vùng của nó ra. Lúc thanh nằm trong dòng chảy bình thường
+      // thì nó không giao với tile nào và việc đăng ký này là vô hại.
+      ref={shellFloatRef}
       data-tauri-drag-region
       onMouseDown={handleMouseDown}
       onDoubleClick={handleChromeDoubleClick}

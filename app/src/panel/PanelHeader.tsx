@@ -19,6 +19,7 @@ export type HeadAction = {
   /** Một icon `lucide-react` dựng sẵn, ví dụ `<Copy size={12} />`. */
   icon: ReactNode;
   onClick: () => void;
+  disabled?: boolean;
   danger?: boolean;
   /** Đang bật (nút hai trạng thái, ví dụ xem thô / xem định dạng). */
   active?: boolean;
@@ -222,6 +223,7 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
             className={"iconbtn" + (a.danger ? " close" : "") + (a.active ? " on" : "")}
             title={a.label}
             aria-label={a.label}
+            disabled={a.disabled}
             onClick={a.onClick}
           >
             {a.icon}
@@ -255,6 +257,7 @@ export function PanelHeader({ panelKey, kind, icon, title, subtitle, chips, acti
                     <button
                       key={a.id}
                       className={a.danger ? "danger" : undefined}
+                      disabled={a.disabled}
                       onClick={() => {
                         a.onClick();
                         setMenuOpen(false);

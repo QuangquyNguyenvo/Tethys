@@ -1,4 +1,5 @@
 mod audio;
+mod browser;
 mod fs_cmd;
 mod pty;
 mod storage;
@@ -259,6 +260,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(PtyManager::default())
         .manage(WatcherManager::default())
+        .manage(browser::BrowserRegistry::default())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -277,15 +279,25 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Đóng cửa sổ mà không dọn thì `pwsh.exe` sống tiếp (tiêu chí B4 / D4).
+            // Browser overlay cũng là cửa sổ top-level, nên mọi nhánh ở đây phải hỏi
+            // "cửa sổ nào" trước. Không hỏi thì đóng một panel web sẽ giết sạch PTY, và
+            // main window giành focus sẽ hạ mục tiêu bộ nhớ của trang đang hiển thị.
+            let is_main = window.label() == "main";
             match event {
                 #[cfg(target_os = "windows")]
                 tauri::WindowEvent::Focused(focused) => {
-                    set_webview_memory_target(window, !focused);
+                    if is_main {
+                        set_webview_memory_target(window, !focused);
+                    }
                 }
                 tauri::WindowEvent::Destroyed | tauri::WindowEvent::CloseRequested { .. } => {
-                    if let Some(mgr) = window.try_state::<PtyManager>() {
-                        mgr.kill_all();
+                    if is_main {
+                        // Đóng cửa sổ mà không dọn thì `pwsh.exe` sống tiếp (tiêu chí B4 / D4).
+                        if let Some(mgr) = window.try_state::<PtyManager>() {
+                            mgr.kill_all();
+                        }
+                    } else {
+                        browser::forget(window.app_handle(), window.label());
                     }
                 }
                 _ => {}
@@ -311,6 +323,15 @@ pub fn run() {
             theme_report,
             boot_panels,
             boot_preview,
+            browser::browser_attach,
+            browser::browser_navigate,
+            browser::browser_reload,
+            browser::browser_go,
+            browser::browser_stop,
+            browser::browser_state,
+            browser::browser_set_memory_target,
+            browser::browser_set_shape,
+            browser::browser_stats,
             fs_cmd::fs_read_text,
             fs_cmd::fs_stat,
             fs_cmd::fs_open_external,

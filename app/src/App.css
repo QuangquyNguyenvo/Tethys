@@ -499,8 +499,7 @@ body {
   position: relative;
   z-index: 1;
   padding: var(--gap);
-  /* Dock nổi đè lên canvas nên phải chừa chỗ, nếu không nó che mất đáy terminal. */
-  padding-bottom: calc(var(--dock-h) + var(--gap) * 2);
+  /* Dock là floating chrome: nó không được co vùng tile hoặc làm block đổi kích thước. */
 }
 
 
@@ -1838,9 +1837,6 @@ body.dragging-panel * {
   transform: none;
   opacity: 1;
 }
-/* Dock ẩn thì canvas lấy lại chỗ nó chừa sẵn. */
-.app.dock-auto .canvas { padding-bottom: var(--gap); }
-
 .dock {
   display: flex;
   align-items: center;
@@ -1945,13 +1941,14 @@ body.dragging-panel * {
     color var(--motion-fast) var(--e-standard),
     transform var(--motion-medium) var(--e-spring);
 }
-.iconbtn:hover {
+.iconbtn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--ui-on-surface) 12%, transparent);
   color: var(--ui-on-surface);
   transform: scale(1.08);
 }
-.iconbtn:active { transform: scale(0.84); }
-.iconbtn.close:hover { background: var(--ui-error); color: var(--ui-on-error); }
+.iconbtn:active:not(:disabled) { transform: scale(0.84); }
+.iconbtn.close:hover:not(:disabled) { background: var(--ui-error); color: var(--ui-on-error); }
+.iconbtn:disabled { opacity: 0.34; cursor: default; }
 .iconbtn.on {
   background: color-mix(in srgb, var(--ui-primary) 22%, transparent);
   color: var(--ui-primary);
@@ -2007,7 +2004,8 @@ body.dragging-panel * {
   font-size: 10px;
   opacity: 0.6;
 }
-.head-menu button:hover { background: var(--ui-surface-container-high); }
+.head-menu button:hover:not(:disabled) { background: var(--ui-surface-container-high); }
+.head-menu button:disabled { opacity: 0.38; cursor: default; }
 
 .notice {
   position: absolute;
@@ -2529,6 +2527,67 @@ body.dragging-panel * {
   border: none;
   display: block;
   background: var(--ui-surface-container-lowest);
+}
+
+.web-loading {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-outline-variant) 55%, transparent);
+  border-radius: var(--r-full);
+  color: var(--ui-on-surface-variant);
+  background: color-mix(in srgb, var(--ui-surface-container-high) 90%, transparent);
+  box-shadow: var(--shadow-1);
+  font-size: 11px;
+  pointer-events: none;
+}
+.web-loading span {
+  width: 10px;
+  height: 10px;
+  border: 2px solid color-mix(in srgb, var(--ui-primary) 30%, transparent);
+  border-top-color: var(--ui-primary);
+  border-radius: 50%;
+  animation: web-loading-spin 700ms linear infinite;
+}
+@keyframes web-loading-spin { to { transform: rotate(360deg); } }
+
+.web-recovery {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(330px, calc(100% - 32px));
+  transform: translate3d(-50%, -50%, 0);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--ui-outline-variant);
+  border-radius: var(--r-xl);
+  color: var(--ui-on-surface);
+  background: var(--ui-surface-container-high);
+  box-shadow: var(--shadow-2);
+  text-align: center;
+  font-size: 12px;
+}
+.web-recovery > span { color: var(--ui-on-surface-variant); line-height: 1.45; }
+.web-recovery > div { display: flex; justify-content: center; gap: 8px; margin-top: 3px; }
+.web-recovery button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-outline-variant);
+  border-radius: var(--r-full);
+  color: var(--ui-on-surface);
+  background: var(--ui-surface-container-highest);
+  font: inherit;
+  cursor: pointer;
+}
+.web-recovery button:last-child {
+  border-color: transparent;
+  color: var(--ui-on-primary);
+  background: var(--ui-primary);
 }
 
 .web-start {

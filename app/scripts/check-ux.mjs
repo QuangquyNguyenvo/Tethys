@@ -45,6 +45,13 @@ assert.doesNotMatch(
   /\.dock-wrap\.auto:hover \.dock-hot\s*\{[^}]*pointer-events:\s*none/s,
   "The dock trigger must not disable itself while hovered",
 );
+const canvasLayout = css.match(/\.canvas\s*\{([^}]*)\}/)?.[1] ?? "";
+assert.match(canvasLayout, /padding:\s*var\(--gap\)/, "The workspace canvas must keep its outer gap");
+assert.doesNotMatch(
+  canvasLayout,
+  /padding-bottom/,
+  "The floating dock must not reserve space or resize workspace blocks",
+);
 
 const autoHideTitlebar = css.match(/\.app\.nav-auto \.titlebar\s*\{([^}]*)\}/)?.[1] ?? "";
 assert.match(autoHideTitlebar, /transform:\s*translate3d\(/, "Auto-hide titlebar must use compositor transform");
@@ -91,6 +98,14 @@ assert.match(reducedMotion, /animation-delay:\s*0ms\s*!important/, "Reduced moti
 assert.match(reducedMotion, /transition-delay:\s*0ms\s*!important/, "Reduced motion must remove transition delays");
 
 assert.match(tiles, /motionTimerRef/, "Panel FLIP layers must release will-change after transition");
+// Offset FLIP đặt lúc render, gỡ trong rAF. Effect chạy lại trước khi frame tới — đúng
+// chuyện xảy ra khi đổi workspace — thì frame bị huỷ và offset treo lại vĩnh viễn, panel
+// đứng lệch khỏi ô của nó. Nhánh không-FLIP bắt buộc phải tự gỡ.
+assert.match(
+  tiles,
+  /if \(!flipping\) \{[\s\S]*?setMotionOffset\(null\);[\s\S]*?return;/,
+  "A render that does not FLIP must clear any pending offset, not just skip",
+);
 assert.match(tiles, /Math\.min\(6,\s*Math\.max\(0,\s*workspaceOrder\)\)/, "Workspace stagger must remain capped");
 assert.match(panelDrag, /requestAnimationFrame\(flushPoint\)/, "Panel drag updates must be throttled to paint frames");
 assert.match(panelDrag, /activeCleanupRef/, "Panel drag must cleanup when its owner unmounts");

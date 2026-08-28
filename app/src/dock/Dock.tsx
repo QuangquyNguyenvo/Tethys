@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { shellFloatRef } from "../web/surfaceVisibility";
 
 export type DockItem = {
   id: string;
@@ -25,11 +26,14 @@ export function Dock({ items, autoHide = false }: { items: DockItem[]; autoHide?
   return (
     <div className={"dock-wrap" + (autoHide ? " auto" : "")}>
       {autoHide && <div className="dock-hot" />}
-      <nav className="dock">
+      {/* Dock nổi trên canvas, mà panel browser là cửa sổ native luôn nằm trên canvas.
+          Đăng ký ở đây để overlay khoét đúng vùng này ra thay vì đè lên. */}
+      <nav className="dock" ref={shellFloatRef}>
         {items.map((it) => (
           <button
             key={it.id}
             className="dock-item"
+            data-native-float-part="transform"
             title={it.label}
             aria-label={it.label}
             onClick={it.onClick}
@@ -41,7 +45,7 @@ export function Dock({ items, autoHide = false }: { items: DockItem[]; autoHide?
             }
           >
             {it.icon}
-            <span className="dock-tip">{it.label}</span>
+            <span className="dock-tip" data-native-float-part="visible">{it.label}</span>
           </button>
         ))}
       </nav>
